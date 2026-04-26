@@ -1,0 +1,2165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CraneWatch v17 — APM Terminals</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg:#d0d4d8;--surface:#e4e7ea;--surface2:#cdd1d5;--border:#b0b8c1;
+    --accent:#0077aa;--accent2:#d45a00;--warn:#c49000;--danger:#c0222e;
+    --good:#1a9a8a;--text:#2a3540;--text-dim:#5a6e7f;--text-bright:#111820;
+    --mono:'Share Tech Mono',monospace;--head:'Barlow Condensed',sans-serif;--body:'Barlow',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:16px;min-height:100vh;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.015) 3px,rgba(0,0,0,.015) 4px);pointer-events:none;z-index:9999}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:13px 28px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+  .logo-area{display:flex;align-items:center;gap:20px}
+  .logo-block{display:flex;flex-direction:column;gap:3px}
+  .logo-title{font-family:var(--head);font-size:15px;font-weight:900;color:#3a3a3a;letter-spacing:3px;text-transform:uppercase}
+  .header-meta{display:flex;align-items:center;gap:22px}
+  .live-badge{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:13px;color:var(--good);letter-spacing:1px}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--good);animation:pulse 2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+  .timestamp{font-family:var(--mono);font-size:13px;color:var(--text-dim)}
+  .edit-mode-btn{padding:8px 20px;background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+  .edit-mode-btn:hover,.edit-mode-btn.active{background:var(--accent);color:var(--bg)}
+
+  .crane-selector{display:flex;align-items:center;padding:0 28px;background:var(--surface2);border-bottom:1px solid var(--border);overflow-x:auto}
+  .crane-tab{padding:11px 18px;font-family:var(--head);font-weight:600;font-size:15px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;border-right:1px solid var(--border)}
+  .crane-tab:hover{color:var(--text)}
+  .crane-tab.active{color:var(--accent);border-bottom-color:var(--accent);background:rgba(0,200,255,.04)}
+  .crane-tab .sdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;background:var(--good)}
+  .crane-tab .sdot.warn{background:var(--warn)}.crane-tab .sdot.danger{background:var(--danger)}
+
+  .section-nav{display:flex;padding:0 28px;background:var(--bg);border-bottom:1px solid var(--border);overflow-x:auto}
+  .snav-tab{padding:10px 22px;font-family:var(--head);font-weight:600;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+  .snav-tab:hover{color:var(--text)}.snav-tab.active{color:var(--accent2);border-bottom-color:var(--accent2)}
+
+  main{padding:22px 28px;display:grid;gap:20px}
+
+  .section-label{font-family:var(--head);font-weight:700;font-size:13px;letter-spacing:4px;text-transform:uppercase;color:var(--text-dim);padding:0 0 10px;border-bottom:1px solid var(--border);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .section-label::before{content:'';display:inline-block;width:3px;height:14px;background:var(--accent2)}
+
+  .card{background:var(--surface);border:1px solid var(--border);padding:18px;position:relative}
+  .card:hover{border-color:#8fa0b0}
+  .card::after{content:'';position:absolute;top:0;right:0;border-top:14px solid var(--border);border-left:14px solid transparent;opacity:.5}
+  .card-title{font-family:var(--head);font-weight:700;font-size:17px;letter-spacing:1px;text-transform:uppercase;color:var(--text-bright);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+  .card-subtitle{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:2px;margin:10px 0 6px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+
+  /* SHEAVE GRID */
+  .sheave-grid{display:grid;gap:7px}
+  .sheave-grid.col6{grid-template-columns:repeat(6,1fr)}
+  .sheave-grid.col4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:1000px){.sheave-grid.col6{grid-template-columns:repeat(4,1fr)}}
+  @media(max-width:700px){.sheave-grid.col6,.sheave-grid.col4{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:500px){.sheave-grid.col6,.sheave-grid.col4{grid-template-columns:repeat(2,1fr)}}
+
+  .group-sep{grid-column:1/-1;font-family:var(--head);font-weight:900;font-size:15px;letter-spacing:3px;text-transform:uppercase;color:var(--accent2);padding:8px 0 4px;border-bottom:1px dashed var(--border);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between}
+  .sheave-cell{background:var(--surface2);border:1px solid var(--border);padding:8px 9px;display:flex;flex-direction:column;gap:5px;transition:border-color .2s}
+  .sheave-cell:hover{border-color:#8fa0b0}
+  .sheave-id{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:1px;font-weight:600}
+
+  /* STATUS */
+  .status-badge{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:1px;padding:3px 9px;text-transform:uppercase;white-space:nowrap;text-align:center;display:block}
+  .status-GOOD  {background:rgba(46,196,182,.12);color:var(--good);  border:1px solid rgba(46,196,182,.3)}
+  .status-MEDIUM{background:rgba(196,144,0,.12); color:var(--warn);  border:1px solid rgba(196,144,0,.3)}
+  .status-BIG   {background:rgba(192,34,46,.22); color:#c0222e;       border:1px solid rgba(192,34,46,.6)}
+  .status-NA    {background:rgba(90,122,153,.1); color:var(--text-dim);border:1px solid rgba(90,122,153,.2)}
+  .field-badge{display:inline-block}
+
+  select.status-select{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:1px;padding:3px 5px;text-transform:uppercase;cursor:pointer;background:var(--surface2);color:var(--text);border:1px solid var(--accent);outline:none;width:100%;display:none}
+  body.edit-mode .status-badge{display:none!important}
+  body.edit-mode select.status-select{display:block!important}
+
+  .sheave-notes-toggle{font-family:var(--mono);font-size:11px;color:var(--text-dim);cursor:pointer;letter-spacing:1px;text-decoration:underline;user-select:none;display:none}
+  body.edit-mode .sheave-notes-toggle{display:block}
+  .sheave-notes-toggle:hover{color:var(--accent)}
+  .sheave-notes-popup{display:none;margin-top:4px}
+  .sheave-notes-popup.open{display:block}
+  .sheave-notes-disp{font-size:12px;color:var(--text-dim);font-style:italic}
+  body.edit-mode .sheave-notes-disp{display:none}
+  .sheave-notes-popup textarea{width:100%;background:var(--surface2);border:1px solid var(--accent);color:var(--text);font-size:12px;padding:4px 6px;resize:vertical;min-height:38px;outline:none;font-family:var(--body)}
+
+  /* FIELD ROWS */
+  .field-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(90,110,127,.25);gap:10px}
+  .field-row:last-child{border-bottom:none}
+  .field-label{font-family:var(--mono);font-size:13px;color:var(--text-dim);letter-spacing:.5px;flex:1}
+  .num-display{font-family:var(--mono);font-size:13px;color:var(--accent);text-align:right;min-width:64px}
+  input.num-input{width:88px;font-family:var(--mono);font-size:12px;background:var(--surface2);border:1px solid var(--accent);color:var(--accent);padding:3px 7px;text-align:right;outline:none;display:none}
+  body.edit-mode .num-display{display:none}
+  body.edit-mode input.num-input{display:inline-block}
+
+  .notes-row{margin-top:10px;padding-top:8px;border-top:1px solid var(--border)}
+  .notes-label{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:4px;letter-spacing:1px}
+  .notes-display{font-size:13px;color:var(--text);min-height:16px;font-style:italic;opacity:.8}
+  .notes-display:empty::after{content:'—';color:var(--text-dim);font-style:normal}
+  textarea.notes-input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--body);font-size:13px;padding:6px 8px;resize:vertical;min-height:48px;outline:none;display:none}
+  textarea.notes-input:focus{border-color:var(--accent)}
+  body.edit-mode .notes-display{display:none}
+  body.edit-mode textarea.notes-input{display:block}
+
+  /* SUMMARY */
+  .summary-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border:1px solid var(--border)}
+  .summary-cell{background:var(--surface);padding:14px 18px;text-align:center}
+  .summary-cell .val{font-family:var(--head);font-weight:900;font-size:34px;line-height:1;margin-bottom:4px}
+  .summary-cell .lbl{font-family:var(--mono);font-size:11px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase}
+  .val-good{color:var(--good)}.val-warn{color:var(--warn)}.val-danger{color:var(--danger)}.val-accent{color:var(--accent)}
+
+  /* INFO BAR */
+  .info-bar{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:20px}
+  .info-cell{background:var(--surface2);padding:10px 14px}
+  .info-cell .lbl{font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:3px}
+  .info-cell .val{font-family:var(--mono);font-size:14px;color:var(--text-bright)}
+  input.info-input{background:transparent;border:none;border-bottom:1px solid var(--accent);color:var(--text-bright);font-family:var(--mono);font-size:14px;outline:none;width:100%;display:none}
+  select.info-input{background:var(--surface2);border:1px solid var(--accent);color:var(--text-bright);font-family:var(--mono);font-size:12px;outline:none;width:100%;display:none;padding:4px}
+  body.edit-mode .info-cell .val{display:none}
+  body.edit-mode input.info-input{display:block}
+  body.edit-mode select.info-input{display:block}
+  body.edit-mode select.section-inspector-select{display:block!important}
+
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  @media(max-width:800px){.two-col,.three-col{grid-template-columns:1fr}.summary-strip{grid-template-columns:1fr 1fr}}
+
+  .section-panel{display:none}
+  .section-panel.active{display:grid;gap:20px}
+
+  .wheel-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:8px}
+  .wheel-item{background:var(--surface2);border:1px solid var(--border);padding:10px}
+  .wheel-item .w-label{font-family:var(--mono);font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:6px;text-align:center}
+  .wheel-icon{text-align:center;font-size:20px;margin-bottom:6px}
+  @media(max-width:600px){.wheel-row{grid-template-columns:1fr 1fr}}
+
+  .save-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface2);border-top:1px solid var(--accent);padding:11px 28px;display:none;align-items:center;justify-content:space-between;z-index:200}
+  body.edit-mode .save-bar{display:flex}
+  .save-bar .info{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:1px}
+  .save-bar .actions{display:flex;gap:10px}
+  .btn{padding:9px 24px;font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;border:none;transition:opacity .2s}
+  .btn:hover{opacity:.85}
+  .btn-save{background:var(--accent);color:var(--bg)}
+  .btn-export{background:var(--accent2);color:#fff}
+  .btn-cancel{background:transparent;border:1px solid var(--text-dim);color:var(--text-dim)}
+  input[type=date].info-input{color-scheme:dark}
+
+  /* ── SPEEDOMETER ─────────────────────────────────────────────────────────── */
+  .speedo-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+  .speedo-wrap{
+    background:var(--surface);border:1px solid var(--border);
+    padding:0;display:flex;flex-direction:column;align-items:center;
+    position:relative;overflow:hidden;
+  }
+  .speedo-wrap::after{content:'';position:absolute;top:0;right:0;border-top:12px solid var(--border);border-left:12px solid transparent;opacity:.5}
+  .speedo-title{font-family:var(--head);font-weight:700;font-size:14px;letter-spacing:3px;text-transform:uppercase;color:var(--text-dim);margin-bottom:14px;text-align:center}
+  .speedo-svg{width:200px;height:115px;overflow:visible}
+  .speedo-track{fill:none;stroke:#1a2535;stroke-width:14;stroke-linecap:round}
+  .speedo-green{fill:none;stroke:#2ec4b6;stroke-width:8;stroke-linecap:butt;opacity:.25}
+  .speedo-yellow{fill:none;stroke:#f5c518;stroke-width:8;stroke-linecap:butt;opacity:.25}
+  .speedo-red{fill:none;stroke:#e63946;stroke-width:8;stroke-linecap:butt;opacity:.25}
+  .speedo-needle{fill:none;stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .9s cubic-bezier(.4,0,.2,1),stroke .4s}
+  .speedo-glow{fill:none;stroke-width:14;stroke-linecap:round;transition:stroke-dashoffset .9s cubic-bezier(.4,0,.2,1),stroke .4s,filter .4s;filter:blur(0px)}
+  .speedo-center-dot{transition:fill .4s}
+  .speedo-pct{font-family:var(--head);font-weight:900;font-size:32px;text-anchor:middle;dominant-baseline:auto;transition:fill .4s}
+  .speedo-status-text{font-family:var(--mono);font-size:11px;text-anchor:middle;letter-spacing:2px;text-transform:uppercase;transition:fill .4s}
+  .speedo-count{font-family:var(--mono);font-size:10px;fill:var(--text-dim);text-anchor:middle}
+  .speedo-tick{stroke:var(--border);stroke-width:1}
+  .speedo-tick-label{font-family:var(--mono);font-size:9px;fill:var(--text-dim);text-anchor:middle}
+
+  /* zone markers */
+  .speedo-zone-label{font-family:var(--mono);font-size:9px;letter-spacing:1px;text-anchor:middle}
+
+  @media(max-width:700px){.speedo-row{grid-template-columns:1fr}}
+
+  /* ── FLEET OVERVIEW ─────────────────────────────────────────────────────── */
+  .fleet-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+  .fleet-card{background:var(--surface);border:1px solid var(--border);padding:14px 16px;cursor:pointer;transition:border-color .2s,transform .15s;position:relative}
+  .fleet-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .fleet-card::after{content:'';position:absolute;top:0;right:0;border-top:12px solid var(--border);border-left:12px solid transparent;opacity:.5}
+  .fleet-card-name{font-family:var(--head);font-weight:900;font-size:22px;letter-spacing:3px;color:var(--text-bright);margin-bottom:4px}
+  .fleet-card-meta{font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:1px;margin-bottom:10px}
+  .fleet-card-bar{height:5px;background:var(--border);border-radius:0;margin:10px 0 6px;overflow:hidden}
+  .fleet-card-bar-fill{height:100%;transition:width .6s ease}
+  .fleet-card-counts{display:flex;gap:10px;font-family:var(--mono);font-size:11px}
+
+  /* ── HYDRAULICS ──────────────────────────────────────────────────────────── */
+  .hyd-system-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:800px){.hyd-system-grid{grid-template-columns:1fr}}
+  .hyd-cylinder-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .hyd-cyl-card{background:var(--surface2);border:1px solid var(--border);padding:10px 12px}
+  .hyd-cyl-label{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:1px;margin-bottom:8px;text-transform:uppercase}
+  .pressure-badge{font-family:var(--head);font-weight:900;font-size:28px;color:var(--accent2);line-height:1}
+  .pressure-unit{font-family:var(--mono);font-size:11px;color:var(--text-dim)}
+
+  /* ── HISTORY ─────────────────────────────────────────────────────────────── */
+  .history-timeline{display:flex;flex-direction:column;gap:0}
+  .history-entry{display:grid;grid-template-columns:140px 1fr auto;gap:0;border-bottom:1px solid var(--border);position:relative}
+  .history-entry::before{content:'';position:absolute;left:139px;top:0;bottom:0;width:2px;background:var(--border)}
+  .history-date{padding:12px 16px 12px 0;font-family:var(--mono);font-size:11px;color:var(--text-dim);text-align:right;line-height:1.5}
+  .history-dot{position:absolute;left:132px;top:18px;width:16px;height:16px;border-radius:50%;border:2px solid var(--surface);z-index:1}
+  .history-body{padding:12px 12px 12px 24px;flex:1}
+  .history-actions{padding:12px 0 12px 12px;display:flex;gap:6px;align-items:flex-start}
+  .btn-history{font-family:var(--mono);font-size:10px;padding:4px 8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;letter-spacing:1px}
+  .btn-history:hover{border-color:var(--accent);color:var(--accent)}
+  .history-empty{font-family:var(--mono);font-size:13px;color:var(--text-dim);text-align:center;padding:40px;letter-spacing:2px}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;align-items:center;justify-content:center}
+  .modal-overlay.open{display:flex}
+  .modal-box{background:var(--surface);border:1px solid var(--accent);padding:28px 32px;min-width:340px;max-width:520px;width:90%}
+  .modal-title{font-family:var(--head);font-weight:900;font-size:20px;letter-spacing:3px;text-transform:uppercase;color:var(--text-bright);margin-bottom:16px}
+  .modal-body{font-family:var(--body);font-size:14px;color:var(--text-dim);margin-bottom:20px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end}
+  #importFileInput{display:none}
+  .btn-import{background:var(--good);color:#fff}
+  .import-drop{border:2px dashed var(--border);padding:24px;text-align:center;font-family:var(--mono);font-size:13px;color:var(--text-dim);cursor:pointer;letter-spacing:1px;transition:border-color .2s}
+  .import-drop:hover,.import-drop.drag-over{border-color:var(--accent);color:var(--accent)}
+  .import-drop.file-ready{border-color:var(--good);color:var(--good)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-area">
+    <div class="logo-block">
+      <svg width="340" height="70" viewBox="0 0 340 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- APM TERMINALS in dark grey -->
+        <text x="0" y="30" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-size="30" fill="#3a3a3a" letter-spacing="1">APM TERMINALS</text>
+        <!-- Lifting Global Trade in orange -->
+        <text x="0" y="54" font-family="Arial,Helvetica,sans-serif" font-weight="400" font-size="18" fill="#E8502A" letter-spacing="0.8">Lifting Global Trade</text>
+      </svg>
+      <div class="logo-title">Cranes Health Monitoring · Tangier</div>
+    </div>
+  </div>
+  <div class="header-meta">
+    <div class="live-badge"><div class="pulse"></div>SYSTEM ONLINE</div>
+    <div class="timestamp" id="ts"></div>
+    <div id="syncStatus" style="font-family:var(--mono);font-size:11px;letter-spacing:1px;padding:4px 10px;background:var(--surface2);border:1px solid var(--border)">☁ Connecting…</div>
+    <button class="edit-mode-btn" style="border-color:var(--good);color:var(--good);font-size:13px" onclick="openImportModal()">⬆ IMPORT</button>
+    <button class="edit-mode-btn" id="editBtn" onclick="toggleEdit()">✎ EDIT MODE</button>
+  </div>
+</header>
+
+<!-- IMPORT MODAL -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal-box">
+    <div class="modal-title">⬆ IMPORT INSPECTION</div>
+    <div class="modal-body">Load a previously exported JSON file to restore inspection data for a crane. The data will overwrite the current record for that crane unit.</div>
+    <div class="import-drop" id="importDrop" onclick="document.getElementById('importFileInput').click()"
+      ondragover="event.preventDefault();this.classList.add('drag-over')"
+      ondragleave="this.classList.remove('drag-over')"
+      ondrop="handleImportDrop(event)">
+      DROP JSON FILE HERE<br><span style="font-size:11px;opacity:.6">or click to browse</span>
+    </div>
+    <input type="file" id="importFileInput" accept=".json" onchange="handleImportFile(this)">
+    <div id="importStatus" style="font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:10px;min-height:18px"></div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn btn-cancel" onclick="closeImportModal()">✕ CANCEL</button>
+      <button class="btn btn-import" id="importConfirmBtn" onclick="confirmImport()" style="opacity:.4;cursor:not-allowed" disabled>✔ IMPORT</button>
+    </div>
+  </div>
+</div>
+
+<div class="crane-selector" id="craneTabs"></div>
+
+<div class="section-nav" id="sectionNav">
+  <div class="snav-tab active" data-sec="sheaves" onclick="switchSection(this)">SHEAVES</div>
+  <div class="snav-tab" data-sec="wheels" onclick="switchSection(this)">TROLLEY WHEELS</div>
+  <div class="snav-tab" data-sec="fans" onclick="switchSection(this)">INVERTER FANS</div>
+  <div class="snav-tab" data-sec="wirerope" onclick="switchSection(this)">WIRE ROPES</div>
+  <div class="snav-tab" data-sec="history" onclick="switchSection(this)" style="color:var(--accent2);border-color:var(--accent2)">📋 HISTORY</div>
+</div>
+
+<main id="mainContent"></main>
+
+<div class="save-bar">
+  <div class="info" id="saveBarInfo">⚡ EDIT MODE ACTIVE — Changes unsaved</div>
+  <div class="actions">
+    <button class="btn btn-export" onclick="exportData()">⬇ EXPORT JSON</button>
+    <button class="btn btn-save" onclick="saveData()">✔ SAVE INSPECTION</button>
+    <button class="btn btn-cancel" onclick="toggleEdit()">✕ CANCEL</button>
+  </div>
+</div>
+
+<script>
+const CRANES = ['QC01','QC02','QC03','QC04','QC05','QC06','QC07','QC08','QC09','QC10'];
+const STATUS_OPTS = ['GOOD','MEDIUM PLAY','BIG PLAY','N/A'];
+
+// ── SHEAVE DEFINITIONS ──────────────────────────────────────────────────────
+// Hoist Sheaves: 36 total — Trolley Right (TR1–TR12), Trolley Left (TL1–TL12),
+//   Backreach (TLS1–TLS4 + TLS1-L–TLS4-L), Headblock (HB1–HB4)
+const HOIST_GROUPS = [
+  { label:'TROLLEY RIGHT',
+    ids:['TR1','TR2','TR3','TR4','TR5','TR6','TR7','TR8','TR9','TR10','TR11','TR12'] },
+  { label:'TROLLEY LEFT',
+    ids:['TL1','TL2','TL3','TL4','TL5','TL6','TL7','TL8','TL9','TL10','TL11','TL12'] },
+  { label:'BACKREACH',
+    ids:['TLS1','TLS2','TLS3','TLS4','TLS1-L','TLS2-L','TLS3-L','TLS4-L'],
+    pairs:[['TLS1','TLS1-L'],['TLS2','TLS2-L'],['TLS3','TLS3-L'],['TLS4','TLS4-L']] },
+  { label:'HEADBLOCK',
+    ids:['HB1','HB2','HB3','HB4'],
+    pairs:[['HB1','HB3'],['HB2','HB4']] }
+];
+
+// Trolley Sheaves: 8 total — Backreach (BR1–BR4), Boom Area (BO1–BO4)
+const TROLLEY_GROUPS = [
+  { label:'BACKREACH',
+    ids:['BR1','BR2','BR3','BR4'] },
+  { label:'BOOM AREA',
+    ids:['BO1','BO2','BO3','BO4'] }
+];
+
+// Boom Sheaves: 22 total — Boom Area (BO1–BO10), Pylon (PY1–PY12)
+const BOOM_GROUPS = [
+  { label:'BOOM AREA',
+    ids:['BO1','BO2','BO3','BO4','BO5','BO6','BO7','BO8','BO9','BO10'] },
+  { label:'PYLON',
+    ids:['PY1','PY2','PY3','PY4','PY5','PY6','PY7','PY8','PY9','PY10','PY11','PY12'],
+    rows:[['PY1','PY2','PY3'],['PY4','PY5','PY6'],['PY7','PY8','PY9'],['PY10','PY11','PY12']] }
+];
+
+function initSheaves(groups) {
+  const o={};
+  groups.forEach(g=>g.ids.forEach(id=>{ o[id]={condition:'GOOD',notes:''} }));
+  return o;
+}
+
+function defaultData() {
+  return {
+    meta:{
+      inspector:'',date:new Date().toISOString().slice(0,10),shift:'DAY',hours:'',nextPM:'',
+      inspectors:{
+        sheaves:{inspector:'',date:'',shift:''},
+        wheels:{inspector:'',date:'',shift:''},
+        fans:{inspector:'',date:'',shift:''},
+        wireropes:{inspector:'',date:'',shift:''}
+      }
+    },
+    hoistSheaves:   initSheaves(HOIST_GROUPS),
+    trolleySheaves: initSheaves(TROLLEY_GROUPS),
+    boomSheaves:    initSheaves(BOOM_GROUPS),
+    tlsHydraulics:{
+      trim:{systemPressure:'',portCylinder:{condition:'GOOD',pressure:'',notes:''},stbdCylinder:{condition:'GOOD',pressure:'',notes:''}},
+      list:{systemPressure:'',portCylinder:{condition:'GOOD',pressure:'',notes:''},stbdCylinder:{condition:'GOOD',pressure:'',notes:''}},
+      skew:{systemPressure:'',frontCylinder:{condition:'GOOD',pressure:'',notes:''},rearCylinder:{condition:'GOOD',pressure:'',notes:''}}
+    },
+    ropeTensionCylinders:{
+      systemPressure:'',
+      port:{condition:'GOOD',pressure:'',stroke:'',notes:''},
+      stbd:{condition:'GOOD',pressure:'',stroke:'',notes:''}
+    },
+    trolleyWheels:(()=>{
+      const o={};
+      // 8 trucks: T1–T8, 8 wheels: W1–W8
+      // Left rail (Sea→Land): W4,T4,T3,W3,W2,T2,T1,W1
+      // Right rail (Sea→Land): W5,T5,T6,W6,W7,T7,T8,W8
+      for(let i=1;i<=8;i++){
+        o['T'+i]={condition:'N/I',notes:''};
+        o['W'+i]={condition:'N/I',measure:'',aPrime:'',bPrime:'',hPrime:'',notes:''};
+      }
+      return o;
+    })(),
+    trolleyTruck:{
+      gearbox:{condition:'GOOD',oilLevel:'',notes:''},
+      drive:{condition:'GOOD',notes:''},
+      brakes:{condition:'GOOD',notes:''},
+      bumpers:{condition:'GOOD',notes:''},
+      lubrication:{condition:'GOOD',notes:''},
+      overallNotes:''
+    },
+    inverterFans:{
+      AFE1:{current:'',status:'GOOD',notes:''},
+      AFE2:{current:'',status:'GOOD',notes:''},
+      AFE3:{current:'',status:'GOOD',notes:''},
+      HOIST1:{current:'',status:'GOOD',notes:''},
+      HOIST2:{current:'',status:'GOOD',notes:''},
+      TBG1:{current:'',status:'GOOD',notes:''},
+      TBG2:{current:'',status:'GOOD',notes:''},
+    },
+    wireRopes:{
+      hoist:{
+        landSide:{
+          serial:'',installDate:'',hours:'',lastInspDate:'',lastGreaseDate:'',
+          rows:[{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''}],
+          notes:''
+        },
+        seaSide:{
+          serial:'',installDate:'',hours:'',lastInspDate:'',lastGreaseDate:'',
+          rows:[{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''}],
+          notes:''
+        }
+      },
+      trolley:{
+        leftSide:{
+          serial:'',installDate:'',hours:'',lastInspDate:'',lastGreaseDate:'',
+          rows:[{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''}],
+          notes:''
+        },
+        rightSide:{
+          serial:'',installDate:'',hours:'',lastInspDate:'',lastGreaseDate:'',
+          rows:[{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''}],
+          notes:''
+        }
+      },
+      boom:{
+        main:{
+          serial:'',installDate:'',hours:'',lastInspDate:'',lastGreaseDate:'',
+          rows:[{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''},{measDia:'',breaks6d:'',breaks30d:''}],
+          notes:''
+        }
+      }
+    }
+  };
+}
+
+// ── FIREBASE ──────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyA2SQuuJcGf6NV8bUFDo4iT6qiPjAhllm0",
+  authDomain: "cranehealthmonitor.firebaseapp.com",
+  projectId: "cranehealthmonitor",
+  storageBucket: "cranehealthmonitor.firebasestorage.app",
+  messagingSenderId: "660649250188",
+  appId: "1:660649250188:web:71cd5537c814f133699aa9"
+};
+
+firebase.initializeApp(firebaseConfig);
+const firestore = firebase.firestore();
+
+let fbOnline = false;
+
+function setSyncStatus(status, msg){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  const colors = {syncing:'#c49000', ok:'#1a9a8a', error:'#c0222e', offline:'#5a6e7f'};
+  const icons  = {syncing:'↻', ok:'☁', error:'⚠', offline:'⊘'};
+  el.innerHTML = `<span style="color:${colors[status]}">${icons[status]} ${msg}</span>`;
+}
+
+// Push crane data to Firestore
+async function pushToCloud(crane){
+  if(!fbOnline) return;
+  try{
+    setSyncStatus('syncing','Syncing…');
+    await firestore.collection('cranes').doc(crane).set(db[crane]);
+    setSyncStatus('ok','Synced ✔');
+  }catch(e){
+    console.error('Push error',e);
+    setSyncStatus('error','Sync failed');
+  }
+}
+
+// Push history snapshot to Firestore
+async function pushHistoryToCloud(crane, snap){
+  if(!fbOnline) return;
+  try{
+    await firestore.collection('history').doc(crane)
+      .collection('snapshots').doc(String(snap.id)).set(snap);
+  }catch(e){console.error('History push error',e);}
+}
+
+// Pull all cranes from Firestore on load
+async function pullFromCloud(){
+  try{
+    setSyncStatus('syncing','Loading from cloud…');
+    const snapshot = await firestore.collection('cranes').get();
+    if(!snapshot.empty){
+      snapshot.forEach(doc=>{
+        if(CRANES.includes(doc.id)){
+          db[doc.id] = {...defaultData(), ...doc.data()};
+        }
+      });
+      localStorage.setItem('craneDB_v3', JSON.stringify(db));
+    }
+    // Pull history
+    for(const crane of CRANES){
+      const hSnap = await firestore.collection('history').doc(crane)
+        .collection('snapshots').orderBy('id','desc').limit(100).get();
+      if(!hSnap.empty){
+        historyDB[crane] = hSnap.docs.map(d=>d.data());
+        historyDB[crane].sort((a,b)=>b.id-a.id);
+      }
+    }
+    localStorage.setItem('craneHistoryDB_v1', JSON.stringify(historyDB));
+    setSyncStatus('ok','Cloud data loaded ✔');
+    renderCraneTabs();
+    renderPage();
+  }catch(e){
+    console.error('Pull error',e);
+    setSyncStatus('offline','Offline — local data');
+  }
+}
+
+// Check connectivity and load
+window.addEventListener('online',  ()=>{ fbOnline=true;  setSyncStatus('ok','Online');     pullFromCloud(); });
+window.addEventListener('offline', ()=>{ fbOnline=false; setSyncStatus('offline','Offline — local data'); });
+fbOnline = navigator.onLine;
+
+// ── STORAGE ───────────────────────────────────────────────────────────────────
+let db={};
+try{const s=localStorage.getItem('craneDB_v3');db=s?JSON.parse(s):{};}catch(e){db={};}
+CRANES.forEach(c=>{if(!db[c])db[c]=defaultData();});
+
+let activeCrane=CRANES[0], activeSection='sheaves', editMode=false;
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+const getNested=(obj,path)=>path.split('.').reduce((o,k)=>(o||{})[k],obj);
+function setNested(obj,path,val){
+  const p=path.split('.');let cur=obj;
+  for(let i=0;i<p.length-1;i++){if(!cur[p[i]])cur[p[i]]={};cur=cur[p[i]];}
+  cur[p[p.length-1]]=val;
+}
+
+function statusClass(val){
+  if(val==='GOOD') return 'status-GOOD';
+  if(val==='MEDIUM PLAY') return 'status-MEDIUM';
+  if(val==='BIG PLAY') return 'status-BIG';
+  return 'status-NA';
+}
+
+function statusBadge(path){
+  const val=getNested(db[activeCrane],path)||'GOOD';
+  return `<span class="status-badge field-badge ${statusClass(val)}">${val}</span>
+<select class="status-select" data-path="${path}">${STATUS_OPTS.map(o=>`<option value="${o}"${o===val?' selected':''}>${o}</option>`).join('')}</select>`;
+}
+
+function numField(path,ph=''){
+  const val=getNested(db[activeCrane],path)||'';
+  return `<span class="num-display">${val||'—'}</span><input class="num-input" type="text" value="${val}" data-path="${path}" placeholder="${ph}">`;
+}
+
+function notesRow(path){
+  const val=getNested(db[activeCrane],path)||'';
+  return `<div class="notes-row"><div class="notes-label">NOTES</div>
+<div class="notes-display">${val}</div>
+<textarea class="notes-input" data-path="${path}" placeholder="Add notes…">${val}</textarea></div>`;
+}
+
+// ── SPEEDOMETER ──────────────────────────────────────────────────────────────
+// GOOD=100pts, MEDIUM PLAY=60pts (monitor), BIG PLAY=0pts (replace), N/A=excluded
+function calcGroupHealth(groups, section){
+  let total=0, score=0;
+  const pts={'GOOD':100,'MEDIUM PLAY':60,'BIG PLAY':0};
+  groups.forEach(g=>g.ids.forEach(id=>{
+    const v=getNested(db[activeCrane],`${section}.${id}.condition`)||'GOOD';
+    if(v!=='N/A'){total++;score+=pts[v]??100;}
+  }));
+  if(total===0)return{pct:100,good:0,fair:0,poor:0,total:0};
+  let good=0,fair=0,poor=0;
+  groups.forEach(g=>g.ids.forEach(id=>{
+    const v=getNested(db[activeCrane],`${section}.${id}.condition`)||'GOOD';
+    if(v==='GOOD')good++;else if(v==='MEDIUM PLAY')fair++;else if(v==='BIG PLAY')poor++;
+  }));
+  return{pct:Math.round(score/total),good,fair,poor,total};
+}
+
+// ── SECTION HEADER (date / shift / inspector per section) ─────────────────────
+const INSPECTOR_NAMES = ['Mohamed Khomsi Krikez','Abdelatif Belhaj','Said Badouh','Mohamed Al Uarhani','Mohamed Nouhy','Abdelaziz El Azhar'];
+const SHIFT_OPTS = ['Z1 Team','Z2 Team','Z3 Team','Other'];
+
+function sectionHeader(secKey, secLabel){
+  const d = db[activeCrane];
+  if(!d.meta.inspectors) d.meta.inspectors={};
+  // Migrate old flat structure to new nested structure
+  if(typeof d.meta.inspectors[secKey] !== 'object' || d.meta.inspectors[secKey]===null){
+    d.meta.inspectors[secKey]={inspector:'',date:'',shift:''};
+  }
+  const si = d.meta.inspectors[secKey];
+  return `<div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:16px;align-items:stretch">
+    <!-- Section badge -->
+    <div style="background:var(--accent);padding:10px 16px;display:flex;align-items:center">
+      <span style="font-family:var(--head);font-weight:900;font-size:13px;letter-spacing:2px;color:#fff;white-space:nowrap">${secLabel}</span>
+    </div>
+    <!-- Date -->
+    <div style="background:var(--surface2);padding:8px 12px">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-bottom:3px">DATE</div>
+      <div class="num-display" style="font-family:var(--mono);font-size:13px;color:var(--text-bright);font-weight:700">${si.date||'—'}</div>
+      <input class="num-input" type="date" value="${si.date||''}" data-path="meta.inspectors.${secKey}.date" style="width:100%;font-size:11px">
+    </div>
+    <!-- Shift -->
+    <div style="background:var(--surface2);padding:8px 12px">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-bottom:3px">SHIFT</div>
+      <div class="num-display" style="font-family:var(--mono);font-size:13px;color:var(--text-bright);font-weight:700">${si.shift||'—'}</div>
+      <select class="num-input" data-path="meta.inspectors.${secKey}.shift" style="width:100%;font-size:11px">
+        <option value="">— SELECT —</option>
+        ${SHIFT_OPTS.map(s=>`<option value="${s}"${si.shift===s?' selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    <!-- Inspector -->
+    <div style="background:var(--surface2);padding:8px 12px">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-bottom:3px">INSPECTOR</div>
+      <div class="num-display" style="font-family:var(--mono);font-size:13px;color:var(--text-bright);font-weight:700">${si.inspector||'—'}</div>
+      <select class="num-input" data-path="meta.inspectors.${secKey}.inspector" style="width:100%;font-size:11px">
+        <option value="">— SELECT —</option>
+        ${INSPECTOR_NAMES.map(n=>`<option value="${n}"${si.inspector===n?' selected':''}>${n}</option>`).join('')}
+      </select>
+    </div>
+  </div>`;
+}
+
+function renderSpeedometer(id, pct, title, good, fair, poor, total){
+  const R=65, cx=110, cy=78;
+  const arcLen = Math.PI * R;
+
+  const filled = (pct/100) * arcLen;
+  const empty  = arcLen - filled;
+
+  const color = pct>=95 ? '#1a9a8a' : pct>=70 ? '#c49000' : '#c0222e';
+  const glow  = pct>=95 ? 'rgba(26,154,138,.4)' : pct>=70 ? 'rgba(196,144,0,.4)' : 'rgba(192,34,46,.4)';
+  const label = pct>=95 ? 'HEALTHY' : pct>=70 ? 'MONITOR' : 'CRITICAL';
+
+  const redEnd = (70/100)*arcLen;
+  const yelEnd = (95/100)*arcLen;
+  const greenEnd = arcLen;
+
+  function tickPos(p){
+    const angle = Math.PI-(p/100)*Math.PI;
+    return {
+      x1: cx+(R-8)*Math.cos(angle),  y1: cy-(R-8)*Math.sin(angle),
+      x2: cx+(R+3)*Math.cos(angle),  y2: cy-(R+3)*Math.sin(angle),
+      lx: cx+(R+13)*Math.cos(angle), ly: cy-(R+13)*Math.sin(angle)
+    };
+  }
+
+  const ticks=[0,25,50,75,100].map(p=>{
+    const t=tickPos(p);
+    return `<line stroke="#b0b8c1" stroke-width="1"
+      x1="${t.x1.toFixed(1)}" y1="${t.y1.toFixed(1)}"
+      x2="${t.x2.toFixed(1)}" y2="${t.y2.toFixed(1)}"/>
+    <text font-family="'Share Tech Mono',monospace" font-size="8" fill="#5a6e7f" text-anchor="middle"
+      x="${t.lx.toFixed(1)}" y="${(t.ly+3).toFixed(1)}">${p}</text>`;
+  }).join('');
+
+  function zonePos(p){
+    const angle=Math.PI-(p/100)*Math.PI;
+    return{x:(cx+(R+22)*Math.cos(angle)).toFixed(1),y:(cy-(R+22)*Math.sin(angle)+2).toFixed(1)};
+  }
+
+  const needleAngle=Math.PI-(pct/100)*Math.PI;
+  const nx=(cx+50*Math.cos(needleAngle)).toFixed(1);
+  const ny=(cy-50*Math.sin(needleAngle)).toFixed(1);
+
+  // viewBox: x=0, y=0, w=220, h=155 — gives room for title above + text below arc
+  return `
+  <div class="speedo-wrap" id="speedo-${id}" style="padding:10px 12px 14px;align-items:stretch">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#5a6e7f;margin-bottom:4px;text-align:left">${title}</div>
+    <div style="display:flex;justify-content:center">
+    <svg viewBox="0 0 220 130" width="220" height="130" style="overflow:visible;display:block">
+
+      <!-- Track -->
+      <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}"
+        fill="none" stroke="#c8cdd2" stroke-width="14" stroke-linecap="butt"/>
+
+      <!-- RED zone -->
+      <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}"
+        fill="none" stroke="#c0222e" stroke-width="10" stroke-linecap="butt" opacity=".3"
+        stroke-dasharray="${redEnd.toFixed(1)} ${(arcLen-redEnd).toFixed(1)}" stroke-dashoffset="0"/>
+      <!-- YELLOW zone -->
+      <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}"
+        fill="none" stroke="#c49000" stroke-width="10" stroke-linecap="butt" opacity=".3"
+        stroke-dasharray="${(yelEnd-redEnd).toFixed(1)} ${(arcLen-(yelEnd-redEnd)).toFixed(1)}"
+        stroke-dashoffset="${(-redEnd).toFixed(1)}"/>
+      <!-- GREEN zone -->
+      <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}"
+        fill="none" stroke="#1a9a8a" stroke-width="10" stroke-linecap="butt" opacity=".3"
+        stroke-dasharray="${(greenEnd-yelEnd).toFixed(1)} ${(arcLen-(greenEnd-yelEnd)).toFixed(1)}"
+        stroke-dashoffset="${(-yelEnd).toFixed(1)}"/>
+
+      <!-- Glow -->
+      <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}"
+        fill="none" stroke="${glow}" stroke-width="12" stroke-linecap="butt"
+        stroke-dasharray="${filled.toFixed(1)} ${empty.toFixed(1)}"
+        stroke-dashoffset="0" style="filter:blur(5px)"/>
+      <!-- Active arc -->
+      <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}"
+        fill="none" stroke="${color}" stroke-width="5" stroke-linecap="butt"
+        stroke-dasharray="${filled.toFixed(1)} ${empty.toFixed(1)}"
+        stroke-dashoffset="0"/>
+
+      <!-- Ticks -->
+      ${ticks}
+
+      <!-- Zone labels -->
+      <text font-family="'Share Tech Mono',monospace" font-size="8" fill="#c0222e" opacity=".85"
+        text-anchor="middle" x="${zonePos(35).x}" y="${zonePos(35).y}">CRIT</text>
+      <text font-family="'Share Tech Mono',monospace" font-size="8" fill="#c49000" opacity=".85"
+        text-anchor="middle" x="${zonePos(82).x}" y="${zonePos(82).y}">WARN</text>
+      <text font-family="'Share Tech Mono',monospace" font-size="8" fill="#1a9a8a" opacity=".85"
+        text-anchor="middle" x="${zonePos(97).x}" y="${zonePos(97).y}">OK</text>
+
+      <!-- Needle -->
+      <line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}"
+        stroke="${color}" stroke-width="2.5" stroke-linecap="round"
+        style="filter:drop-shadow(0 0 3px ${color})"/>
+      <circle cx="${cx}" cy="${cy}" r="6" fill="${color}" opacity=".9"/>
+      <circle cx="${cx}" cy="${cy}" r="3" fill="#d0d4d8"/>
+
+      <!-- Percentage -->
+      <text x="${cx}" y="${cy-14}" text-anchor="middle"
+        font-family="'Barlow Condensed',sans-serif" font-weight="900" font-size="30" fill="${color}">${pct}%</text>
+
+      <!-- Status label -->
+      <text x="${cx}" y="${cy+26}" text-anchor="middle"
+        font-family="'Share Tech Mono',monospace" font-size="11" letter-spacing="2" fill="${color}">${label}</text>
+
+      <!-- Count breakdown -->
+      <text x="${cx}" y="${cy+40}" text-anchor="middle"
+        font-family="'Share Tech Mono',monospace" font-size="9" fill="#5a6e7f">✔${good}  ⚠${fair}  ✖${poor} / ${total} PCS</text>
+    </svg>
+    </div>
+  </div>`;
+}
+
+function renderSpeedometerRow(hoistH, trolleyH, boomH){
+  return `<div class="speedo-row">
+    ${renderSpeedometer('hoist',   hoistH.pct,   'HOIST SHEAVES',   hoistH.good,   hoistH.fair,   hoistH.poor,   hoistH.total)}
+    ${renderSpeedometer('trolley', trolleyH.pct, 'TROLLEY SHEAVES', trolleyH.good, trolleyH.fair, trolleyH.poor, trolleyH.total)}
+    ${renderSpeedometer('boom',    boomH.pct,    'BOOM SHEAVES',    boomH.good,    boomH.fair,    boomH.poor,    boomH.total)}
+  </div>`;
+}
+
+// ── SHEAVE GROUPS ────────────────────────────────────────────────────────────
+function sheaveCell(section, id){
+  const path=`${section}.${id}`;
+  const cond=getNested(db[activeCrane],path+'.condition')||'GOOD';
+  const notes=getNested(db[activeCrane],path+'.notes')||'';
+  return `<div class="sheave-cell">
+    <div class="sheave-id">${id}</div>
+    <span class="status-badge ${statusClass(cond)}">${cond}</span>
+    <select class="status-select" data-path="${path}.condition">${STATUS_OPTS.map(o=>`<option value="${o}"${o===cond?' selected':''}>${o}</option>`).join('')}</select>
+    <span class="sheave-notes-toggle" onclick="toggleNotes(this)">+ NOTES</span>
+    <div class="sheave-notes-popup">
+      <div class="sheave-notes-disp">${notes}</div>
+      <textarea data-path="${path}.notes" placeholder="Notes…">${notes}</textarea>
+    </div>
+  </div>`;
+}
+
+function calcGroupHealthById(ids, section){
+  const pts={'GOOD':100,'MEDIUM PLAY':60,'BIG PLAY':0};
+  let total=0,score=0,good=0,fair=0,poor=0;
+  ids.forEach(id=>{
+    const v=getNested(db[activeCrane],`${section}.${id}.condition`)||'GOOD';
+    if(v!=='N/A'){
+      total++;score+=pts[v]??100;
+      if(v==='GOOD')good++;else if(v==='MEDIUM PLAY')fair++;else if(v==='BIG PLAY')poor++;
+    }
+  });
+  const pct=total>0?Math.round(score/total):100;
+  return{pct,good,fair,poor,total};
+}
+
+function miniSpeedo(uid, pct){
+  const R=38, cx=44, cy=42;
+  const arcLen=Math.PI*R;
+  const filled=(pct/100)*arcLen;
+  const empty=arcLen-filled;
+  const color=pct>=95?'#1a9a8a':pct>=85?'#c49000':'#c0222e';
+  const glow=pct>=95?'rgba(26,154,138,.35)':pct>=85?'rgba(196,144,0,.35)':'rgba(192,34,46,.35)';
+  const needleAngle=Math.PI-(pct/100)*Math.PI;
+  const nx=(cx+28*Math.cos(needleAngle)).toFixed(1);
+  const ny=(cy-28*Math.sin(needleAngle)).toFixed(1);
+  const redEnd=(85/100)*arcLen, yelEnd=(95/100)*arcLen;
+  return `<svg viewBox="0 4 88 50" width="110" height="62" style="display:block;overflow:visible">
+    <!-- track -->
+    <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}" fill="none" stroke="#b8c4ce" stroke-width="9" stroke-linecap="butt"/>
+    <!-- red zone -->
+    <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}" fill="none" stroke="#c0222e" stroke-width="6" stroke-linecap="butt" opacity=".2"
+      stroke-dasharray="${redEnd.toFixed(1)} ${(arcLen-redEnd).toFixed(1)}" stroke-dashoffset="0"/>
+    <!-- yellow zone -->
+    <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}" fill="none" stroke="#c49000" stroke-width="6" stroke-linecap="butt" opacity=".2"
+      stroke-dasharray="${(yelEnd-redEnd).toFixed(1)} ${(arcLen-(yelEnd-redEnd)).toFixed(1)}" stroke-dashoffset="${(-redEnd).toFixed(1)}"/>
+    <!-- green zone -->
+    <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}" fill="none" stroke="#1a9a8a" stroke-width="6" stroke-linecap="butt" opacity=".2"
+      stroke-dasharray="${(arcLen-yelEnd).toFixed(1)} ${yelEnd.toFixed(1)}" stroke-dashoffset="${(-yelEnd).toFixed(1)}"/>
+    <!-- glow -->
+    <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}" fill="none" stroke="${glow}" stroke-width="9" stroke-linecap="butt"
+      stroke-dasharray="${filled.toFixed(1)} ${empty.toFixed(1)}" stroke-dashoffset="0" style="filter:blur(3px)"/>
+    <!-- active arc -->
+    <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="butt"
+      stroke-dasharray="${filled.toFixed(1)} ${empty.toFixed(1)}" stroke-dashoffset="0"/>
+    <!-- needle -->
+    <line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="${color}" stroke-width="2" stroke-linecap="round"
+      style="filter:drop-shadow(0 0 2px ${color})"/>
+    <circle cx="${cx}" cy="${cy}" r="4" fill="${color}" opacity=".9"/>
+    <circle cx="${cx}" cy="${cy}" r="2" fill="#d0d4d8"/>
+    <!-- pct text -->
+    <text x="${cx}" y="${cy-8}" text-anchor="middle" font-family="'Share Tech Mono',monospace" font-size="11" font-weight="bold" fill="${color}">${pct}%</text>
+  </svg>`;
+}
+
+function renderSheaveGroups(groups, section, cols){
+  return `<div class="sheave-grid ${cols}">
+  ${groups.map(g=>{
+    const h=calcGroupHealthById(g.ids,section);
+    const sepColor=h.pct>=95?'#1a9a8a':h.pct>=85?'#c49000':'#c0222e';
+    const groupHeader=`
+      <div class="group-sep" style="grid-column:1/-1;display:grid;grid-template-columns:1fr auto 3fr;align-items:center">
+        <span>${g.label}</span>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          ${miniSpeedo(g.label.replace(/\s+/g,'_'),h.pct)}
+          <div style="font-family:'Share Tech Mono',monospace;font-size:10px;line-height:1.5;color:var(--text-dim);text-align:center">
+            <div style="color:${sepColor};font-size:11px;font-weight:bold;letter-spacing:1px">${h.pct>=95?'HEALTHY':h.pct>=85?'MONITOR':'CRITICAL'}</div>
+            <div>✔${h.good} ⚠${h.fair} ✖${h.poor}</div>
+          </div>
+        </div>
+        <div></div>
+      </div>`;
+
+    if(g.pairs){
+      const pairCols=g.pairs.map(([top,bot])=>`
+        <div style="display:flex;flex-direction:column;gap:7px">
+          ${sheaveCell(section,top)}
+          <div style="border-left:2px solid var(--accent2);padding-left:6px">
+            ${sheaveCell(section,bot)}
+          </div>
+        </div>`).join('');
+      return `${groupHeader}
+        <div style="grid-column:1/-1;display:grid;grid-template-columns:repeat(${g.pairs.length},1fr);gap:7px">
+          ${pairCols}
+        </div>`;
+    }
+    if(g.rows){
+      const rowsHtml=g.rows.map((row,i)=>`
+        <div style="display:grid;grid-template-columns:repeat(${row.length},1fr);gap:7px;${i>0?'border-left:2px solid var(--accent2);padding-left:6px':''}">
+          ${row.map(id=>sheaveCell(section,id)).join('')}
+        </div>`).join('');
+      return `${groupHeader}
+        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:7px">
+          ${rowsHtml}
+        </div>`;
+    }
+    // Standard flat layout
+    return `${groupHeader}
+      ${g.ids.map(id=>sheaveCell(section,id)).join('')}`;
+  }).join('')}
+  </div>`;
+}
+
+function toggleNotes(btn){
+  btn.nextElementSibling.classList.toggle('open');
+}
+
+// ── SUMMARY ──────────────────────────────────────────────────────────────────
+function calcSummary(data){
+  let good=0,fair=0,poor=0,total=0;
+  const walk=v=>{
+    if(typeof v==='string'){
+      // Standard sheave/truck conditions
+      if(STATUS_OPTS.includes(v)&&v!=='N/A'){
+        total++;
+        if(v==='GOOD')good++;
+        else if(v==='MEDIUM PLAY')fair++;
+        else if(v==='BIG PLAY')poor++;
+      }
+      // Truck opts: '1 — NORMAL PLAY', '2 — MEDIUM PLAY', '3 — BIG PLAY'
+      else if(v.startsWith('1 —')){total++;good++;}
+      else if(v.startsWith('2 —')){total++;fair++;}
+      else if(v.startsWith('3 —')){total++;poor++;}
+      // N/I = not inspected, skip
+    }else if(v&&typeof v==='object')Object.values(v).forEach(walk);
+  };
+  // Sheaves + wheels + truck
+  ['hoistSheaves','trolleySheaves','boomSheaves','trolleyWheels','trolleyTruck'].forEach(k=>walk(data[k]));
+
+  // Inverter fans: GOOD / WARNING / FAULT
+  if(data.inverterFans){
+    Object.values(data.inverterFans).forEach(fan=>{
+      const s=fan.status||'';
+      if(s==='GOOD'){total++;good++;}
+      else if(s==='WARNING'){total++;fair++;}
+      else if(s==='FAULT'){total++;poor++;}
+    });
+  }
+
+  // Wire ropes: auto status from rows (diameter & wire breaks)
+  if(data.wireRopes){
+    const ropeTypes=[
+      {key:'hoist',   nomDia:31.5, discDia:29.3, sides:['landSide','seaSide']},
+      {key:'trolley', nomDia:25,   discDia:23,   sides:['leftSide','rightSide']},
+      {key:'boom',    nomDia:35,   discDia:32.5, sides:['main']},
+    ];
+    ropeTypes.forEach(rt=>{
+      const rData=data.wireRopes[rt.key]||{};
+      rt.sides.forEach(side=>{
+        const sd=rData[side]||{};
+        const rows=Array.isArray(sd.rows)?sd.rows:[];
+        let ropeStatus='GOOD';
+        rows.forEach(r=>{
+          const m=parseFloat(r.measDia);
+          if(!isNaN(m)){
+            if(m<=rt.discDia) ropeStatus='REPLACE';
+            else if(m<rt.nomDia*0.93&&ropeStatus!=='REPLACE') ropeStatus='MONITOR';
+          }
+          const b6=parseInt(r.breaks6d)||0;
+          const b30=parseInt(r.breaks30d)||0;
+          if(b6>16||b30>32) ropeStatus='REPLACE';
+          else if((b6>12||b30>24)&&ropeStatus!=='REPLACE') ropeStatus='MONITOR';
+        });
+        // Only count if rope has any data entered
+        const hasData=rows.some(r=>r.measDia||r.breaks6d||r.breaks30d);
+        if(hasData){
+          total++;
+          if(ropeStatus==='GOOD') good++;
+          else if(ropeStatus==='MONITOR') fair++;
+          else poor++;
+        }
+      });
+    });
+  }
+
+  return {good,fair,poor,total};
+}
+
+// ── WHEEL CELL HELPERS ────────────────────────────────────────────────────────
+const TRUCK_OPTS = ['N/I','1 — NORMAL PLAY','2 — MEDIUM PLAY','3 — BIG PLAY'];
+const WHEEL_OPTS = ['N/I','1 — WITHIN RANGE','2 — WITHIN LIMIT','3 — OUT OF LIMIT'];
+
+function truckColor(val){
+  if(val.startsWith('1')) return '#1a9a8a';
+  if(val.startsWith('2')) return '#c49000';
+  if(val.startsWith('3')) return '#c0222e';
+  return '#5a6e7f';
+}
+function wheelColor(val){
+  if(val.startsWith('1')) return '#1a9a8a';
+  if(val.startsWith('2')) return '#c49000';
+  if(val.startsWith('3')) return '#c0222e';
+  return '#5a6e7f';
+}
+function truckCode(val){ return val===''||val==='N/I'?'0':val.charAt(0); }
+
+function wheelTruckCell(id, label, cond, notes){
+  const path='trolleyWheels.'+id;
+  const col=truckColor(cond);
+  return `<div style="background:rgba(212,90,0,.07);border:1px solid rgba(212,90,0,.25);border-left:3px solid ${col};padding:10px;display:flex;flex-direction:column;gap:6px">
+    <div style="display:flex;align-items:center;gap:5px">
+      <span style="font-size:13px;line-height:1">⚙</span>
+      <span style="font-family:var(--head);font-size:14px;font-weight:900;color:var(--text-bright);letter-spacing:1px">${label}</span>
+    </div>
+    <div style="font-family:var(--head);font-weight:900;font-size:32px;color:${col};text-align:center;line-height:1">${truckCode(cond)}</div>
+    <span class="status-badge" style="background:${col}22;color:${col};border:1px solid ${col}55;font-size:9px;padding:2px 4px;text-align:center;display:none">${cond}</span>
+    <select class="status-select" data-path="${path}.condition" style="font-size:10px">
+      ${TRUCK_OPTS.map(o=>`<option value="${o}"${o===cond?' selected':''}>${o}</option>`).join('')}
+    </select>
+    <div class="notes-display" style="font-size:10px;color:var(--text-dim);font-style:italic;min-height:14px">${notes}</div>
+    <textarea class="notes-input" data-path="${path}.notes" placeholder="Notes…" style="font-size:11px">${notes}</textarea>
+  </div>`;
+}
+
+function wheelWearCell(id, label, cond, measure, notes){
+  const path='trolleyWheels.'+id;
+  const d=db[activeCrane];
+  const aPrime=getNested(d,path+'.aPrime')||'';
+  const bPrime=getNested(d,path+'.bPrime')||'';
+  const hPrime=getNested(d,path+'.hPrime')||'';
+
+  // Auto-calculate condition from measurements
+  function evalCondition(){
+    const aV=parseFloat(aPrime), bV=parseFloat(bPrime), hV=parseFloat(hPrime);
+    let worst='1 — WITHIN THE RANGE';
+    // a': limit 17mm — at limit=WITHIN LIMIT, below=OUT OF LIMIT
+    if(!isNaN(aV)){
+      if(aV<17) worst='3 — OUT OF LIMIT';
+      else if(aV===17 && worst!=='3 — OUT OF LIMIT') worst='2 — WITHIN THE LIMIT';
+    }
+    // b': limit 165mm — at limit=WITHIN LIMIT, above=OUT OF LIMIT
+    if(!isNaN(bV)){
+      if(bV>165) worst='3 — OUT OF LIMIT';
+      else if(bV===165 && worst!=='3 — OUT OF LIMIT') worst='2 — WITHIN THE LIMIT';
+    }
+    // h': limit 35mm — at limit=WITHIN LIMIT, above=OUT OF LIMIT
+    if(!isNaN(hV)){
+      if(hV>35) worst='3 — OUT OF LIMIT';
+      else if(hV===35 && worst!=='3 — OUT OF LIMIT') worst='2 — WITHIN THE LIMIT';
+    }
+    // if no measurements entered keep existing condition
+    if(isNaN(aV)&&isNaN(bV)&&isNaN(hV)) return cond;
+    return worst;
+  }
+  const autoCond = (aPrime||bPrime||hPrime) ? evalCondition() : cond;
+  const col=wheelColor(autoCond);
+
+  return `<div style="background:rgba(0,119,170,.07);border:1px solid rgba(0,119,170,.25);border-left:3px solid ${col};padding:10px;display:flex;flex-direction:column;gap:6px">
+    <div style="display:flex;align-items:center;gap:5px">
+      <span style="font-size:13px;line-height:1">◎</span>
+      <span style="font-family:var(--head);font-size:14px;font-weight:900;color:var(--text-bright);letter-spacing:1px">${label}</span>
+    </div>
+    <div style="font-family:var(--head);font-weight:900;font-size:32px;color:${col};text-align:center;line-height:1">${truckCode(autoCond)}</div>
+    <div style="font-family:var(--mono);font-size:9px;color:${col};text-align:center;letter-spacing:1px">${autoCond.replace(/^\d — /,'')}</div>
+    <select class="status-select" data-path="${path}.condition" style="font-size:10px">
+      ${WHEEL_OPTS.map(o=>`<option value="${o}"${o===autoCond?' selected':''}>${o}</option>`).join('')}
+    </select>
+    <!-- Measurements -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px">
+      ${[
+        ["a'", path+'.aPrime', aPrime, '#E8502A', 17,  'below'],
+        ["b'", path+'.bPrime', bPrime, '#0077aa', 165, 'above'],
+        ["h'", path+'.hPrime', hPrime, '#1a9a8a', 35,  'above']
+      ].map(([dim,dpath,val,dimCol,lim,dir])=>{
+        const v=parseFloat(val);
+        let limCol='var(--text-dim)';
+        if(!isNaN(v)){
+          const out=(dir==='below'&&v<lim)||(dir==='above'&&v>lim);
+          const atLim=(dir==='below'&&v===lim)||(dir==='above'&&v===lim);
+          limCol=out?'var(--danger)':atLim?'var(--warn)':'var(--good)';
+        }
+        return `<div style="background:var(--surface2);border:1px solid ${limCol};padding:5px 4px;text-align:center">
+          <div style="font-family:var(--head);font-size:13px;font-weight:900;color:${dimCol}">${dim}</div>
+          <div class="num-display" style="font-family:var(--mono);font-size:12px;color:${limCol};font-weight:bold">${val||'—'}</div>
+          <input class="num-input" type="text" value="${val}" data-path="${dpath}" placeholder="mm" style="width:100%;font-size:11px;text-align:center">
+          <div style="font-family:var(--mono);font-size:8px;color:var(--text-dim)">lim:${lim}mm</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="notes-display" style="font-size:10px;color:var(--text-dim);font-style:italic;min-height:14px">${notes}</div>
+    <textarea class="notes-input" data-path="${path}.notes" placeholder="Notes…" style="font-size:11px">${notes}</textarea>
+  </div>`;
+}
+
+// ── RENDER ───────────────────────────────────────────────────────────────────
+function renderPage(){
+  const d=db[activeCrane];
+  const s=calcSummary(d);
+
+  document.getElementById('mainContent').innerHTML=`
+  <div class="info-bar">
+    <div class="info-cell"><div class="lbl">CRANE UNIT</div><div class="val">${activeCrane}</div></div>
+    ${[
+      {lbl:'DATE',key:'date',type:'date'},
+    ].map(f=>`<div class="info-cell"><div class="lbl">${f.lbl}</div>
+      <div class="val">${d.meta[f.key]||'—'}</div>
+      <input class="info-input" data-key="${f.key}" type="${f.type}" value="${d.meta[f.key]||''}" placeholder="${f.lbl}">
+    </div>`).join('')}
+    <div class="info-cell"><div class="lbl">SHIFT</div>
+      <div class="val">${d.meta.shift||'—'}</div>
+      <select class="info-input" data-key="shift" onchange="document.getElementById('shiftOther_${activeCrane}').style.display=this.value==='Other'?'block':'none'">
+        <option value="">— SELECT —</option>
+        ${['Z1 Team','Z2 Team','Z3 Team','Other'].map(s=>`<option value="${s}"${d.meta.shift===s?' selected':''}>${s}</option>`).join('')}
+      </select>
+      <input id="shiftOther_${activeCrane}" class="info-input" data-key="shiftNote" type="text" value="${d.meta.shiftNote||''}" placeholder="Specify shift…" style="margin-top:4px;display:${d.meta.shift==='Other'?'block':'none'}">
+    </div>
+  </div>
+
+  <div class="summary-strip" style="grid-template-columns:repeat(5,1fr)">
+    ${(()=>{const scored=s.good*100+s.fair*60;const pct=s.total>0?Math.round(scored/s.total):100;const col=pct>=95?'var(--good)':pct>=70?'var(--warn)':'var(--danger)';return `<div class="summary-cell"><div class="val" style="color:${col}">${pct}%</div><div class="lbl">HEALTH SCORE</div></div>`;})()} 
+    <div class="summary-cell"><div class="val val-accent">${s.total}</div><div class="lbl">ITEMS CHECKED</div></div>
+    <div class="summary-cell"><div class="val val-good">${s.good}</div><div class="lbl">GOOD</div></div>
+    <div class="summary-cell"><div class="val val-warn">${s.fair}</div><div class="lbl">MEDIUM PLAY</div></div>
+    <div class="summary-cell"><div class="val val-danger">${s.poor}</div><div class="lbl">BIG PLAY</div></div>
+  </div>
+
+  <!-- ═══ SHEAVES ═══ -->
+  <div class="section-panel ${activeSection==='sheaves'?'active':''}" id="panel-sheaves">
+    ${sectionHeader('sheaves','SHEAVES INSPECTION')}
+
+    ${renderSpeedometerRow(
+      calcGroupHealth(HOIST_GROUPS,'hoistSheaves'),
+      calcGroupHealth(TROLLEY_GROUPS,'trolleySheaves'),
+      calcGroupHealth(BOOM_GROUPS,'boomSheaves')
+    )}
+
+    <div>
+      <div class="section-label">HOIST SHEAVES — 36 POINTS</div>
+      <div class="card">
+        <div class="card-title" style="font-size:20px;">HOIST SHEAVES <span style="font-size:14px;opacity:.6">TR · TL · TLS · HB</span></div>
+        ${renderSheaveGroups(HOIST_GROUPS,'hoistSheaves','col6')}
+      </div>
+    </div>
+    <div>
+      <div class="section-label">TROLLEY SHEAVES — 8 POINTS</div>
+      <div class="card">
+        <div class="card-title" style="font-size:20px;">TROLLEY SHEAVES <span style="font-size:14px;opacity:.6">BR1–BR4 · BO1–BO4</span></div>
+        ${renderSheaveGroups(TROLLEY_GROUPS,'trolleySheaves','col4')}
+      </div>
+    </div>
+    <div>
+      <div class="section-label">BOOM SHEAVES — 22 POINTS</div>
+      <div class="card">
+        <div class="card-title" style="font-size:20px;">BOOM SHEAVES <span style="font-size:14px;opacity:.6">BO1–BO10 · PY1–PY12</span></div>
+        ${renderSheaveGroups(BOOM_GROUPS,'boomSheaves','col6')}
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ WHEELS ═══ -->
+  <div class="section-panel ${activeSection==='wheels'?'active':''}" id="panel-wheels">
+    ${sectionHeader('wheels','TROLLEY WHEELS INSPECTION')}
+    <div class="section-label">TROLLEY WHEEL & TRUCK PLAY STATUS</div>
+
+    <!-- LEGEND ROW -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+      <div class="card" style="padding:12px 16px">
+        <div class="card-title" style="font-size:15px;margin-bottom:10px">TROLLEY TRUCKS</div>
+        ${[['0','NOT YET INSPECTED','#5a6e7f'],['1','NORMAL PLAY','#1a9a8a'],['2','MEDIUM PLAY','#c49000'],['3','BIG PLAY','#c0222e']].map(([code,lbl,col])=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)">
+          <span style="font-family:var(--mono);font-size:20px;font-weight:900;color:${col};min-width:24px;text-align:center">${code}</span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--text)">${lbl}</span>
+        </div>`).join('')}
+      </div>
+      <div class="card" style="padding:12px 16px">
+        <div class="card-title" style="font-size:15px;margin-bottom:10px">TROLLEY WHEELS</div>
+        ${[['0','NOT YET INSPECTED','#5a6e7f'],['1','WITHIN THE RANGE','#1a9a8a'],['2','WITHIN THE LIMIT','#c49000'],['3','OUT OF LIMIT','#c0222e']].map(([code,lbl,col])=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)">
+          <span style="font-family:var(--mono);font-size:20px;font-weight:900;color:${col};min-width:24px;text-align:center">${code}</span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--text)">${lbl}</span>
+        </div>`).join('')}
+      </div>
+      <div class="card" style="padding:12px 16px">
+        <div class="card-title" style="font-size:15px;margin-bottom:10px">WEAR LIMITS — REFERENCE</div>
+
+        <!-- WHEEL CROSS-SECTION SVG -->
+        <div style="background:#e8f4f8;border:1px solid #9ac;padding:10px 8px 6px;margin-bottom:12px;text-align:center">
+          <svg viewBox="0 0 400 130" width="100%" style="max-width:400px;display:block;margin:0 auto;overflow:visible" font-family="'Share Tech Mono',monospace">
+
+            <!-- ── wheel body (light blue fill) ── -->
+            <!-- outer bottom base -->
+            <rect x="20" y="82" width="360" height="28" fill="#7ecfea" stroke="#3a8aaa" stroke-width="1"/>
+            <!-- left flange block -->
+            <rect x="20" y="30" width="72" height="52" fill="#7ecfea" stroke="#3a8aaa" stroke-width="1"/>
+            <!-- right flange block -->
+            <rect x="308" y="30" width="72" height="52" fill="#7ecfea" stroke="#3a8aaa" stroke-width="1"/>
+            <!-- tread channel (dotted dark = worn rubber/steel contact) -->
+            <rect x="92" y="52" width="216" height="30" fill="#2a2a2a" opacity="0.82"/>
+            <!-- tread channel top lighter strip (yellow wear indicator line) -->
+            <rect x="92" y="52" width="216" height="4" fill="#e6c200" opacity="0.7"/>
+            <!-- rounded corners on flanges (top) -->
+            <path d="M20,30 Q20,18 32,18 L80,18 Q92,18 92,30" fill="#7ecfea" stroke="#3a8aaa" stroke-width="1"/>
+            <path d="M308,30 Q308,18 320,18 L368,18 Q380,18 380,30" fill="#7ecfea" stroke="#3a8aaa" stroke-width="1"/>
+            <!-- flange top caps -->
+            <rect x="20" y="18" width="72" height="12" rx="4" fill="#7ecfea" stroke="#3a8aaa" stroke-width="1"/>
+            <rect x="308" y="18" width="72" height="12" rx="4" fill="#7ecfea" stroke="#3a8aaa" stroke-width="1"/>
+
+            <!-- ── dimension lines ── -->
+            <!-- dim a (top left: flange width) -->
+            <line x1="20" y1="10" x2="92" y2="10" stroke="#333" stroke-width="1" marker-start="url(#arr)" marker-end="url(#arr)"/>
+            <text x="56" y="8" text-anchor="middle" font-size="10" fill="#111" font-weight="bold">a</text>
+            <!-- dim b (top centre: tread width) -->
+            <line x1="92" y1="10" x2="308" y2="10" stroke="#333" stroke-width="1" marker-start="url(#arr)" marker-end="url(#arr)"/>
+            <text x="200" y="8" text-anchor="middle" font-size="10" fill="#111" font-weight="bold">b</text>
+            <!-- dim a (top right: flange width) -->
+            <line x1="308" y1="10" x2="380" y2="10" stroke="#333" stroke-width="1" marker-start="url(#arr)" marker-end="url(#arr)"/>
+            <text x="344" y="8" text-anchor="middle" font-size="10" fill="#111" font-weight="bold">a</text>
+
+            <!-- dim h' (left side: full flange height from top to tread bottom) -->
+            <line x1="12" y1="18" x2="12" y2="82" stroke="#333" stroke-width="1" marker-start="url(#arr)" marker-end="url(#arr)"/>
+            <text x="8" y="52" text-anchor="middle" font-size="9" fill="#111" font-weight="bold" transform="rotate(-90,8,52)">h'</text>
+
+            <!-- dim h (right side: flange height from top down to yellow wear line) -->
+            <line x1="390" y1="18" x2="390" y2="52" stroke="#333" stroke-width="1" marker-start="url(#arr)" marker-end="url(#arr)"/>
+            <text x="396" y="38" text-anchor="start" font-size="10" fill="#111" font-weight="bold">h</text>
+
+            <!-- dim a' (bottom left: half length of a, starting from left wheel edge) -->
+            <line x1="20" y1="120" x2="56" y2="120" stroke="#555" stroke-width="1" marker-start="url(#arr)" marker-end="url(#arr)"/>
+            <text x="38" y="129" text-anchor="middle" font-size="9" fill="#333" font-weight="bold">a'</text>
+
+            <!-- vertical dashed lines from b' ends up to top of wheel -->
+            <line x1="56" y1="18" x2="56" y2="120" stroke="#555" stroke-width="0.8" stroke-dasharray="4,3"/>
+            <line x1="344" y1="18" x2="344" y2="120" stroke="#555" stroke-width="0.8" stroke-dasharray="4,3"/>
+
+            <!-- dim b' (bottom centre: from end of left a' to start of right a') -->
+            <line x1="56" y1="120" x2="344" y2="120" stroke="#555" stroke-width="1" marker-start="url(#arr)" marker-end="url(#arr)"/>
+            <text x="200" y="129" text-anchor="middle" font-size="9" fill="#333" font-weight="bold">b'</text>
+
+            <!-- dim a' (bottom right: half length of a, ending at right wheel edge) -->
+            <line x1="344" y1="120" x2="380" y2="120" stroke="#555" stroke-width="1" marker-start="url(#arr)" marker-end="url(#arr)"/>
+            <text x="362" y="129" text-anchor="middle" font-size="9" fill="#333" font-weight="bold">a'</text>
+
+            <!-- centre vertical dashed line -->
+            <line x1="200" y1="14" x2="200" y2="112" stroke="#555" stroke-width="0.8" stroke-dasharray="4,3"/>
+
+            <!-- tick marks on bottom baseline -->
+            <line x1="110" y1="112" x2="118" y2="120" stroke="#555" stroke-width="1.2"/>
+            <line x1="118" y1="112" x2="126" y2="120" stroke="#555" stroke-width="1.2"/>
+            <line x1="274" y1="112" x2="282" y2="120" stroke="#555" stroke-width="1.2"/>
+            <line x1="282" y1="112" x2="290" y2="120" stroke="#555" stroke-width="1.2"/>
+
+            <!-- arrowhead markers -->
+            <defs>
+              <marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+                <path d="M0,0 L6,3 L0,6 Z" fill="#333"/>
+              </marker>
+            </defs>
+          </svg>
+        </div>
+
+        <!-- DIMENSIONS REFERENCE TABLE -->
+        <table style="width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:11px;margin-bottom:10px">
+          <thead>
+            <tr style="background:var(--surface2)">
+              <th style="padding:5px 7px;border:1px solid var(--border);text-align:left;color:var(--text-dim);letter-spacing:1px;font-weight:700">DIM</th>
+              <th style="padding:5px 7px;border:1px solid var(--border);text-align:left;color:var(--text-dim);letter-spacing:1px;font-weight:700">DESCRIPTION</th>
+              <th style="padding:5px 7px;border:1px solid var(--border);text-align:center;color:var(--accent);letter-spacing:1px;font-weight:700">NOMINAL</th>
+              <th style="padding:5px 7px;border:1px solid var(--border);text-align:center;color:var(--danger);letter-spacing:1px;font-weight:700">LIMIT</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${[
+              ['a',  'Flange width (original)',   '26 mm',   '—'],
+              ["a'", 'Flange width (worn)',        '—',       '17 mm'],
+              ['b',  'Tread width (top)',          '147 mm',  '—'],
+              ["b'", 'Tread width (bottom)',       '—',       '165 mm'],
+              ['h',  'Flange height (full)',       '25 mm',   '—'],
+              ["h'", 'Flange height (above tread)','—',       '35 mm'],
+            ].map(([dim,desc,nom,lim],i)=>`
+            <tr style="background:${i%2===0?'var(--surface)':'var(--surface2)'}">
+              <td style="padding:5px 7px;border:1px solid var(--border);font-weight:900;color:var(--accent2);font-size:13px">${dim}</td>
+              <td style="padding:5px 7px;border:1px solid var(--border);color:var(--text)">${desc}</td>
+              <td style="padding:5px 7px;border:1px solid var(--border);text-align:center;color:var(--accent);font-weight:700">${nom}</td>
+              <td style="padding:5px 7px;border:1px solid var(--border);text-align:center;color:${lim!=='—'?'var(--danger)':'var(--text-dim)'};font-weight:${lim!=='—'?'700':'400'}">${lim}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);padding:6px 8px;background:var(--surface2);border:1px solid var(--border);line-height:1.6">
+          ⚠ Measure flange at point <b style="color:var(--accent2)">a</b> (flange width). Replace wheel when <b style="color:var(--danger)">a' ≤ 17 mm</b>.
+        </div>
+      </div>
+    </div>
+
+    <!-- POSITION DIAGRAM -->
+    <div class="card">
+      <div class="card-title" style="font-size:17px">TROLLEY TRUCK PLAY & WHEEL WEAR — POSITION DIAGRAM</div>
+
+      <!-- SEA SIDE / LAND SIDE orientation label -->
+      <div style="display:grid;grid-template-columns:1fr 48px 1fr;gap:0;margin-bottom:4px">
+        <div style="font-family:var(--head);font-weight:900;font-size:13px;letter-spacing:3px;color:var(--text-dim);text-align:center;padding:4px 0">LEFT RAIL</div>
+        <div></div>
+        <div style="font-family:var(--head);font-weight:900;font-size:13px;letter-spacing:3px;color:var(--text-dim);text-align:center;padding:4px 0">RIGHT RAIL</div>
+      </div>
+
+      <!-- SEA SIDE banner -->
+      <div style="font-family:var(--head);font-weight:900;font-size:13px;letter-spacing:4px;color:var(--accent);text-align:center;padding:7px 0;background:rgba(0,119,170,.07);border:1px solid rgba(0,119,170,.2);margin-bottom:6px">
+        ▲ SEA SIDE
+      </div>
+
+      <!--
+        Physical layout (top = Sea Side, bottom = Land Side):
+        LEFT RAIL          RIGHT RAIL
+        Wheel 4            Wheel 5
+        Truck 4            Truck 5
+        ── bogie gap ──    ── bogie gap ──
+        Truck 3            Truck 6
+        Wheel 3            Wheel 6
+        ── centre gap ──   ── centre gap ──
+        Wheel 2            Wheel 7
+        Truck 2            Truck 7
+        ── bogie gap ──    ── bogie gap ──
+        Truck 1            Truck 8
+        Wheel 1            Wheel 8
+      -->
+
+      <div style="display:grid;grid-template-columns:1fr 48px 1fr;gap:0;align-items:stretch">
+
+        <!-- ── ROW: W4 | spacer | W5 ── -->
+        <div>${wheelWearCell('W4','WHEEL 4', getNested(db[activeCrane],'trolleyWheels.W4.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.W4.measure')||'', getNested(db[activeCrane],'trolleyWheels.W4.notes')||'')}</div>
+        <div style="display:flex;align-items:center;justify-content:center">
+          <div style="width:2px;height:100%;background:var(--border);margin:0 auto"></div>
+        </div>
+        <div>${wheelWearCell('W5','WHEEL 5', getNested(db[activeCrane],'trolleyWheels.W5.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.W5.measure')||'', getNested(db[activeCrane],'trolleyWheels.W5.notes')||'')}</div>
+
+        <!-- ── ROW: T4 | pin | T5 ── -->
+        <div style="padding:4px 0">${wheelTruckCell('T4','TRUCK 4', getNested(db[activeCrane],'trolleyWheels.T4.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.T4.notes')||'')}</div>
+        <div style="display:flex;align-items:center;justify-content:center;position:relative">
+          <div style="width:2px;height:100%;background:var(--border);margin:0 auto"></div>
+          <div style="position:absolute;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);font-family:var(--mono);font-size:9px;font-weight:700;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;letter-spacing:0">B1</div>
+        </div>
+        <div style="padding:4px 0">${wheelTruckCell('T5','TRUCK 5', getNested(db[activeCrane],'trolleyWheels.T5.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.T5.notes')||'')}</div>
+
+        <!-- ── BOGIE GAP ── -->
+        <div style="padding:3px 0;grid-column:1/-1">
+          <div style="border-top:2px dashed var(--accent2);margin:0;opacity:.4"></div>
+        </div>
+
+        <!-- ── ROW: T3 | pin | T6 ── -->
+        <div style="padding:4px 0">${wheelTruckCell('T3','TRUCK 3', getNested(db[activeCrane],'trolleyWheels.T3.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.T3.notes')||'')}</div>
+        <div style="display:flex;align-items:center;justify-content:center;position:relative">
+          <div style="width:2px;height:100%;background:var(--border);margin:0 auto"></div>
+          <div style="position:absolute;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);font-family:var(--mono);font-size:9px;font-weight:700;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;letter-spacing:0">B2</div>
+        </div>
+        <div style="padding:4px 0">${wheelTruckCell('T6','TRUCK 6', getNested(db[activeCrane],'trolleyWheels.T6.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.T6.notes')||'')}</div>
+
+        <!-- ── ROW: W3 | spacer | W6 ── -->
+        <div>${wheelWearCell('W3','WHEEL 3', getNested(db[activeCrane],'trolleyWheels.W3.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.W3.measure')||'', getNested(db[activeCrane],'trolleyWheels.W3.notes')||'')}</div>
+        <div style="display:flex;align-items:center;justify-content:center">
+          <div style="width:2px;height:100%;background:var(--border);margin:0 auto"></div>
+        </div>
+        <div>${wheelWearCell('W6','WHEEL 6', getNested(db[activeCrane],'trolleyWheels.W6.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.W6.measure')||'', getNested(db[activeCrane],'trolleyWheels.W6.notes')||'')}</div>
+
+        <!-- ── CENTRE GAP ── -->
+        <div style="padding:6px 0;grid-column:1/-1">
+          <div style="border-top:3px solid var(--accent);margin:0;opacity:.25"></div>
+          <div style="text-align:center;font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:2px;margin-top:3px">CENTRE</div>
+        </div>
+
+        <!-- ── ROW: W2 | spacer | W7 ── -->
+        <div>${wheelWearCell('W2','WHEEL 2', getNested(db[activeCrane],'trolleyWheels.W2.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.W2.measure')||'', getNested(db[activeCrane],'trolleyWheels.W2.notes')||'')}</div>
+        <div style="display:flex;align-items:center;justify-content:center">
+          <div style="width:2px;height:100%;background:var(--border);margin:0 auto"></div>
+        </div>
+        <div>${wheelWearCell('W7','WHEEL 7', getNested(db[activeCrane],'trolleyWheels.W7.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.W7.measure')||'', getNested(db[activeCrane],'trolleyWheels.W7.notes')||'')}</div>
+
+        <!-- ── ROW: T2 | pin | T7 ── -->
+        <div style="padding:4px 0">${wheelTruckCell('T2','TRUCK 2', getNested(db[activeCrane],'trolleyWheels.T2.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.T2.notes')||'')}</div>
+        <div style="display:flex;align-items:center;justify-content:center;position:relative">
+          <div style="width:2px;height:100%;background:var(--border);margin:0 auto"></div>
+          <div style="position:absolute;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);font-family:var(--mono);font-size:9px;font-weight:700;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;letter-spacing:0">B3</div>
+        </div>
+        <div style="padding:4px 0">${wheelTruckCell('T7','TRUCK 7', getNested(db[activeCrane],'trolleyWheels.T7.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.T7.notes')||'')}</div>
+
+        <!-- ── BOGIE GAP ── -->
+        <div style="padding:3px 0;grid-column:1/-1">
+          <div style="border-top:2px dashed var(--accent2);margin:0;opacity:.4"></div>
+        </div>
+
+        <!-- ── ROW: T1 | pin | T8 ── -->
+        <div style="padding:4px 0">${wheelTruckCell('T1','TRUCK 1', getNested(db[activeCrane],'trolleyWheels.T1.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.T1.notes')||'')}</div>
+        <div style="display:flex;align-items:center;justify-content:center;position:relative">
+          <div style="width:2px;height:100%;background:var(--border);margin:0 auto"></div>
+          <div style="position:absolute;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);font-family:var(--mono);font-size:9px;font-weight:700;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;letter-spacing:0">B4</div>
+        </div>
+        <div style="padding:4px 0">${wheelTruckCell('T8','TRUCK 8', getNested(db[activeCrane],'trolleyWheels.T8.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.T8.notes')||'')}</div>
+
+        <!-- ── ROW: W1 | spacer | W8 ── -->
+        <div>${wheelWearCell('W1','WHEEL 1', getNested(db[activeCrane],'trolleyWheels.W1.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.W1.measure')||'', getNested(db[activeCrane],'trolleyWheels.W1.notes')||'')}</div>
+        <div style="display:flex;align-items:center;justify-content:center">
+          <div style="width:2px;height:100%;background:var(--border);margin:0 auto"></div>
+        </div>
+        <div>${wheelWearCell('W8','WHEEL 8', getNested(db[activeCrane],'trolleyWheels.W8.condition')||'N/I', getNested(db[activeCrane],'trolleyWheels.W8.measure')||'', getNested(db[activeCrane],'trolleyWheels.W8.notes')||'')}</div>
+
+      </div><!-- end grid -->
+
+      <!-- LAND SIDE banner -->
+      <div style="font-family:var(--head);font-weight:900;font-size:13px;letter-spacing:4px;color:var(--accent2);text-align:center;padding:7px 0;background:rgba(212,90,0,.07);border:1px solid rgba(212,90,0,.2);margin-top:6px">
+        ▼ LAND SIDE
+      </div>
+
+    </div><!-- end card -->
+  </div>
+
+  <!-- ═══ TRUCK ═══ -->
+  <div class="section-panel ${activeSection==='truck'?'active':''}" id="panel-truck">
+    <div class="section-label">TROLLEY TRUCK CONDITION</div>
+    <div class="three-col">
+      ${[
+        {key:'gearbox',   title:'GEARBOX',     extra:`<div class="field-row"><span class="field-label">Oil Level (%)</span>${numField('trolleyTruck.gearbox.oilLevel','%')}</div>`},
+        {key:'drive',     title:'DRIVE UNIT',  extra:''},
+        {key:'brakes',    title:'BRAKES',      extra:''},
+        {key:'bumpers',   title:'BUMPERS',     extra:''},
+        {key:'lubrication',title:'LUBRICATION',extra:''},
+      ].map(item=>`<div class="card">
+        <div class="card-title">${item.title}</div>
+        <div class="field-row"><span class="field-label">Condition</span>${statusBadge('trolleyTruck.'+item.key+'.condition')}</div>
+        ${item.extra}
+        ${notesRow('trolleyTruck.'+item.key+'.notes')}
+      </div>`).join('')}
+      <div class="card">
+        <div class="card-title">OVERALL NOTES</div>
+        ${notesRow('trolleyTruck.overallNotes')}
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ HYDRAULICS ═══ -->
+  <div class="section-panel ${activeSection==='hydraulics'?'active':''}" id="panel-hydraulics">
+    <div class="section-label">TLS HYDRAULIC SYSTEMS</div>
+
+    <div class="hyd-system-grid">
+      ${['trim','list','skew'].map(sys=>{
+        const sysLabel=sys.toUpperCase();
+        const cylKeys=sys==='skew'?['frontCylinder','rearCylinder']:['portCylinder','stbdCylinder'];
+        const cylLabels=sys==='skew'?['FRONT CYLINDER','REAR CYLINDER']:['PORT CYLINDER','STBD CYLINDER'];
+        const basePath='tlsHydraulics.'+sys;
+        const sysPressure=getNested(db[activeCrane],basePath+'.systemPressure')||'';
+        return `<div class="card">
+          <div class="card-title">${sysLabel} SYSTEM</div>
+          <div class="field-row">
+            <span class="field-label">System Pressure (bar)</span>
+            ${numField(basePath+'.systemPressure','bar')}
+          </div>
+          <div class="hyd-cylinder-row">
+            ${cylKeys.map((ck,ci)=>{
+              const cp=basePath+'.'+ck;
+              const cv=getNested(db[activeCrane],cp+'.condition')||'GOOD';
+              const pressure=getNested(db[activeCrane],cp+'.pressure')||'';
+              return `<div class="hyd-cyl-card">
+                <div class="hyd-cyl-label">${cylLabels[ci]}</div>
+                <div class="field-row" style="padding:4px 0">
+                  <span class="field-label" style="font-size:11px">Condition</span>
+                  ${statusBadge(cp+'.condition')}
+                </div>
+                <div class="field-row" style="padding:4px 0">
+                  <span class="field-label" style="font-size:11px">Pressure (bar)</span>
+                  ${numField(cp+'.pressure','bar')}
+                </div>
+                ${notesRow(cp+'.notes')}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="section-label" style="margin-top:8px">ROPE TENSION CYLINDERS</div>
+    <div class="two-col">
+      ${['port','stbd'].map(side=>{
+        const base='ropeTensionCylinders.'+side;
+        return `<div class="card">
+          <div class="card-title">${side.toUpperCase()} CYLINDER</div>
+          <div class="field-row"><span class="field-label">Condition</span>${statusBadge(base+'.condition')}</div>
+          <div class="field-row"><span class="field-label">Pressure (bar)</span>${numField(base+'.pressure','bar')}</div>
+          <div class="field-row"><span class="field-label">Stroke (mm)</span>${numField(base+'.stroke','mm')}</div>
+          ${notesRow(base+'.notes')}
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="card">
+      <div class="card-title" style="font-size:15px">SYSTEM PRESSURE</div>
+      <div class="field-row">
+        <span class="field-label">RTC System Pressure (bar)</span>
+        ${numField('ropeTensionCylinders.systemPressure','bar')}
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ INVERTER FANS ═══ -->
+  <div class="section-panel ${activeSection==='fans'?'active':''}" id="panel-fans">
+    ${sectionHeader('fans','INVERTER FANS INSPECTION')}
+    <div class="section-label">INVERTER FANS — CURRENT MONITORING (A)</div>
+
+    ${(()=>{
+      const FANS = [
+        {key:'AFE1',  label:'AFE 1 FAN',   group:'AFE'},
+        {key:'AFE2',  label:'AFE 2 FAN',   group:'AFE'},
+        {key:'AFE3',  label:'AFE 3 FAN',   group:'AFE'},
+        {key:'HOIST1',label:'HOIST 1 FAN', group:'HOIST'},
+        {key:'HOIST2',label:'HOIST 2 FAN', group:'HOIST'},
+        {key:'TBG1',  label:'TBG 1 FAN',   group:'TBG'},
+        {key:'TBG2',  label:'TBG 2 FAN',   group:'TBG'},
+      ];
+
+      const groups = ['AFE','HOIST','TBG'];
+      return groups.map(grp=>{
+        const fans = FANS.filter(f=>f.group===grp);
+        return `
+        <div>
+          <div class="section-label">${grp}</div>
+          <div class="three-col">
+            ${fans.map(f=>{
+              const fan = getNested(db[activeCrane],'inverterFans.'+f.key)||{current:'',status:'GOOD',notes:''};
+              const current = fan.current||'';
+              const status  = fan.status||'GOOD';
+              const notes   = fan.notes||'';
+              const statusCol = status==='GOOD'?'var(--good)':status==='WARNING'?'var(--warn)':'var(--danger)';
+              const fanVal = parseFloat(current)||0;
+              const barCol = fanVal<11.5?'var(--good)':fanVal<13?'var(--warn)':'var(--danger)';
+              return `<div class="card" style="position:relative">
+                <div class="card-title" style="font-size:17px;font-weight:900;text-align:center;letter-spacing:2px;color:var(--text-dim);justify-content:center">${f.label}</div>
+
+                <!-- Current display -->
+                <div style="text-align:center;padding:18px 0 8px">
+                  <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text-dim);letter-spacing:2px;margin-bottom:6px">CURRENT (A)</div>
+                  <div class="num-display" style="font-family:var(--head);font-weight:900;font-size:48px;color:${barCol};line-height:1">${current||'—'}</div>
+                  <div style="font-family:var(--mono);font-size:13px;color:var(--text-dim);margin-top:4px">A</div>
+                  <input class="num-input" type="text" value="${current}" data-path="inverterFans.${f.key}.current" placeholder="0.0" style="font-size:28px;width:120px;text-align:center;margin-top:4px">
+                </div>
+
+                <!-- Horizontal score meter -->
+                ${(()=>{
+                  const MAX=18;
+                  const val=parseFloat(current)||0;
+                  const pct=Math.min(val/MAX*100,100);
+                  const barCol=val<11.5?'var(--good)':val<13?'var(--warn)':'var(--danger)';
+                  const gPct=63.9;
+                  const yPct=8.3;
+                  const rPct=27.8;
+                  return `<div style="padding:0 4px 14px">
+                    <div style="position:relative;height:27px;background:var(--surface2);border:1px solid var(--border);border-radius:2px;overflow:visible">
+                      <!-- zone bands: green 0-63.9%, yellow 63.9-72.2%, red 72.2-100% -->
+                      <div style="position:absolute;left:0;width:${gPct}%;height:100%;background:#1a9a8a;border-radius:2px 0 0 2px"></div>
+                      <div style="position:absolute;left:${gPct}%;width:${yPct}%;height:100%;background:#c49000"></div>
+                      <div style="position:absolute;left:${gPct+yPct}%;width:${rPct}%;height:100%;background:#c0222e;border-radius:0 2px 2px 0"></div>
+                      <!-- black needle extending 5px above and below -->
+                      <div style="position:absolute;left:calc(${pct.toFixed(1)}% - 1.5px);width:3px;height:37px;top:-5px;background:#111;z-index:2;box-shadow:0 0 3px rgba(0,0,0,.6)"></div>
+                    </div>
+                    <!-- tick labels aligned to scale -->
+                    <div style="position:relative;font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:10px;height:12px">
+                      ${[0,2,4,6,8,10,11.5,13,16,18].map(v=>`<span style="position:absolute;left:${(v/MAX*100).toFixed(1)}%;transform:translateX(-50%)">${v}</span>`).join('')}
+                    </div>
+                    <!-- zone labels -->
+                    <div style="display:flex;font-family:var(--mono);font-size:8px;margin-top:6px">
+                      <span style="width:${gPct}%;color:#1a9a8a;letter-spacing:1px">▌ OK (&lt;11.5A)</span>
+                      <span style="width:${yPct}%;color:#c49000;letter-spacing:1px">▌W</span>
+                      <span style="width:${rPct}%;color:#c0222e;letter-spacing:1px">▌ HIGH</span>
+                    </div>
+                  </div>`;
+                })()}
+
+                <!-- Status -->
+                <div class="field-row">
+                  <span class="field-label">Status</span>
+                  <span class="status-badge field-badge" style="background:${statusCol}22;color:${statusCol};border:1px solid ${statusCol}55">${status}</span>
+                  <select class="status-select" data-path="inverterFans.${f.key}.status">
+                    ${['GOOD','WARNING','FAULT'].map(o=>`<option value="${o}"${o===status?' selected':''}>${o}</option>`).join('')}
+                  </select>
+                </div>
+
+                ${notesRow('inverterFans.'+f.key+'.notes')}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }).join('');
+    })()}
+
+  </div>
+
+  <!-- ═══ WIRE ROPES ═══ -->
+  <div class="section-panel ${activeSection==='wirerope'?'active':''}" id="panel-wirerope">
+    ${sectionHeader('wireropes','WIRE ROPES INSPECTION')}
+    <div class="section-label">WIRE ROPE INSPECTION & FOLLOW-UP</div>
+
+    ${(()=>{
+      const ROPE_STATUS_OPTS = ['N/I','GOOD','MONITOR','REPLACE'];
+      const ropeStatusColor = s => s==='GOOD'?'var(--good)':s==='MONITOR'?'var(--warn)':s==='REPLACE'?'var(--danger)':'var(--text-dim)';
+
+      // Discard diameter = nominal - 10%
+      const discardDia = nom => (nom * 0.9).toFixed(1);
+
+      const ropes = [
+        {
+          type:'HOIST', color:'#0077aa', nomDia:31.5, discDia:'29.3',
+          specs:{diameter:'31.5 mm', length:'720 m', lifetime:'4 000 h', inspection:'Every 1 000 h', greasing:'Every 1 000 h'},
+          sides:[{key:'landSide',label:'LAND SIDE'},{key:'seaSide',label:'SEA SIDE'}]
+        },
+        {
+          type:'TROLLEY', color:'#E8502A', nomDia:25, discDia:'23',
+          specs:{diameter:'25 mm', length:'440 m', lifetime:'—', inspection:'Every 1 000 h', greasing:'Every 1 000 h'},
+          sides:[{key:'leftSide',label:'LEFT SIDE'},{key:'rightSide',label:'RIGHT SIDE'}]
+        },
+        {
+          type:'BOOM', color:'#1a9a8a', nomDia:35, discDia:'32.5',
+          specs:{diameter:'35 mm', length:'1 430 m', lifetime:'—', inspection:'Every 6 months', greasing:'Every 6 months'},
+          sides:[{key:'main',label:'MAIN ROPE'}]
+        },
+      ];
+
+      return ropes.map(rope=>{
+        const rData = getNested(db[activeCrane],'wireRopes.'+rope.type.toLowerCase())||{};
+        const discDia = rope.discDia;
+        return `
+        <div class="card" style="border-top:3px solid ${rope.color};margin-bottom:18px">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+            <div style="font-family:var(--head);font-weight:900;font-size:22px;letter-spacing:3px;color:${rope.color}">${rope.type} WIRE ROPE</div>
+          </div>
+
+          <!-- Specs strip -->
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:16px">
+            ${[['⌀ DIAMETER',rope.specs.diameter],['LENGTH',rope.specs.length],['LIFETIME',rope.specs.lifetime],['INSPECTION',rope.specs.inspection],['GREASING',rope.specs.greasing]].map(([l,v])=>`
+            <div style="background:var(--surface2);padding:8px;text-align:center">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-bottom:3px">${l}</div>
+              <div style="font-family:var(--head);font-weight:700;font-size:13px;color:${rope.color}">${v}</div>
+            </div>`).join('')}
+          </div>
+
+          <!-- Rope sides -->
+          <div class="${rope.sides.length>1?'two-col':''}">
+            ${rope.sides.map(side=>{
+              const base = 'wireRopes.'+rope.type.toLowerCase()+'.'+side.key;
+              const sd = rData[side.key]||{rows:[]};
+              const rawRows = sd.rows;
+              const rows = Array.isArray(rawRows) ? rawRows : (rawRows ? Object.values(rawRows) : []);
+              // Ensure always 20 rows
+              while(rows.length < 20) rows.push({measDia:'',breaks6d:'',breaks30d:''});
+
+              // Overall status: any meas dia <= discard dia = REPLACE, close = MONITOR
+              let ropeStatus='GOOD';
+              rows.forEach(r=>{
+                const m=parseFloat(r.measDia);
+                if(!isNaN(m)){
+                  if(m<=parseFloat(discDia)) ropeStatus='REPLACE';
+                  else if(m<rope.nomDia*0.93 && ropeStatus!=='REPLACE') ropeStatus='MONITOR';
+                }
+                const b6=parseInt(r.breaks6d)||0;
+                const b30=parseInt(r.breaks30d)||0;
+                if(b6>16||b30>32){ ropeStatus='REPLACE'; }
+                else if((b6>12||b30>24) && ropeStatus!=='REPLACE'){ ropeStatus='MONITOR'; }
+              });
+              const ropeCol=ropeStatusColor(ropeStatus);
+
+              return `<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid ${rope.color};padding:12px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                  <div style="font-family:var(--head);font-weight:900;font-size:16px;letter-spacing:2px;color:var(--text-bright)">${side.label}</div>
+                  <div style="background:var(--surface);border:2px solid ${ropeCol};padding:4px 12px;font-family:var(--head);font-weight:900;font-size:14px;color:${ropeCol}">${ropeStatus}</div>
+                </div>
+
+                <!-- Identity fields -->
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+                  ${[
+                    ['SERIAL NUMBER','serial','text'],
+                    ['INSTALL DATE','installDate','date'],
+                    ['ACCUM. HOURS','hours','text'],
+                    ['LAST INSP. DATE','lastInspDate','date'],
+                    ['LAST GREASE DATE','lastGreaseDate','date'],
+                  ].map(([lbl,fkey,ftype])=>{
+                    const val = sd[fkey]||'';
+                    return `<div style="background:var(--surface);border:1px solid var(--border);padding:6px 8px">
+                      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-bottom:2px">${lbl}</div>
+                      <div class="num-display" style="font-family:var(--mono);font-size:12px;color:var(--text-bright);font-weight:700">${val||'—'}</div>
+                      ${ftype==='date'
+                        ? `<input class="num-input" type="date" value="${val}" data-path="${base}.${fkey}" style="width:100%;font-size:11px">`
+                        : `<input class="num-input" type="text" value="${val}" data-path="${base}.${fkey}" placeholder="${lbl}" style="width:100%;font-size:11px">`
+                      }
+                    </div>`;
+                  }).join('')}
+                </div>
+
+                <!-- Measurement Table -->
+                <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px dashed var(--border)">INSPECTION MEASUREMENT TABLE — ISO 4309 / CASAR WireCo</div>
+                <div style="overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px">
+                  <thead>
+                    <tr style="background:#1b3a5c;color:#fff">
+                      <th style="padding:7px 10px;border:1px solid #2a4a6c;text-align:center;font-weight:700;width:28px">#</th>
+                      <th style="padding:7px 10px;border:1px solid #2a4a6c;text-align:center;font-weight:700">Nominal Ø<br><span style="font-weight:400;font-size:9px">(mm)</span></th>
+                      <th style="padding:7px 10px;border:1px solid #2a4a6c;text-align:center;font-weight:700">Discard Ø<br><span style="font-weight:400;font-size:9px">(mm)</span></th>
+                      <th style="padding:7px 10px;border:1px solid #2a4a6c;text-align:center;font-weight:700">Meas. Ø<br><span style="font-weight:400;font-size:9px">(mm)</span></th>
+                      <th style="padding:7px 10px;border:1px solid #2a4a6c;text-align:center;font-weight:700">Visible wire<br>breaks in 6d</th>
+                      <th style="padding:7px 10px;border:1px solid #2a4a6c;text-align:center;font-weight:700">Visible wire<br>breaks in 30d</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rows.map((r,i)=>{
+                      const mDia=parseFloat(r.measDia);
+                      const b6=parseInt(r.breaks6d)||0;
+                      const b30=parseInt(r.breaks30d)||0;
+                      let rowBg=i%2===0?'var(--surface)':'#d8eaf5';
+                      let diaCol='var(--text)';
+                      if(!isNaN(mDia)){
+                        if(mDia<=parseFloat(discDia)){rowBg='rgba(192,34,46,.12)';diaCol='var(--danger)';}
+                        else if(mDia<rope.nomDia*0.93){rowBg='rgba(196,144,0,.10)';diaCol='var(--warn)';}
+                        else {rowBg=i%2===0?'rgba(26,154,138,.06)':'#d8eaf5';diaCol='var(--good)';}
+                      }
+                      // 6d limits: ≤12 ok, 12-16 monitor, >16 replace
+                      const b6Col = b6===0?'var(--text)':b6<=12?'var(--good)':b6<=16?'var(--warn)':'var(--danger)';
+                      const b6Weight = b6>12?'700':'400';
+                      // 30d limits: ≤24 ok, 24-32 monitor, >32 replace
+                      const b30Col = b30===0?'var(--text)':b30<=24?'var(--good)':b30<=32?'var(--warn)':'var(--danger)';
+                      const b30Weight = b30>24?'700':'400';
+                      return `<tr style="background:${rowBg}">
+                        <td style="padding:5px 8px;border:1px solid var(--border);text-align:center;color:var(--text-dim);font-size:10px">${i+1}</td>
+                        <td style="padding:5px 8px;border:1px solid var(--border);text-align:center;color:var(--text-dim)">${rope.nomDia}</td>
+                        <td style="padding:5px 8px;border:1px solid var(--border);text-align:center;color:var(--danger);font-weight:700">${discDia}</td>
+                        <td style="padding:5px 8px;border:1px solid var(--border);text-align:center">
+                          <span class="num-display" style="color:${diaCol};font-weight:${!isNaN(mDia)?'700':'400'}">${r.measDia||'—'}</span>
+                          <input class="num-input" type="text" value="${r.measDia||''}" data-path="${base}.rows.${i}.measDia" placeholder="mm" style="width:60px;font-size:11px;text-align:center">
+                        </td>
+                        <td style="padding:5px 8px;border:1px solid var(--border);text-align:center">
+                          <span class="num-display" style="color:${b6Col};font-weight:${b6Weight}">${r.breaks6d||'—'}</span>
+                          <input class="num-input" type="text" value="${r.breaks6d||''}" data-path="${base}.rows.${i}.breaks6d" placeholder="0" style="width:50px;font-size:11px;text-align:center">
+                        </td>
+                        <td style="padding:5px 8px;border:1px solid var(--border);text-align:center">
+                          <span class="num-display" style="color:${b30Col};font-weight:${b30Weight}">${r.breaks30d||'—'}</span>
+                          <input class="num-input" type="text" value="${r.breaks30d||''}" data-path="${base}.rows.${i}.breaks30d" placeholder="0" style="width:50px;font-size:11px;text-align:center">
+                        </td>
+                      </tr>`;
+                    }).join('')}
+                  </tbody>
+                </table>
+                </div>
+
+                <div style="margin-top:6px">
+                ${notesRow(base+'.notes')}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }).join('');
+    })()}
+
+  </div>
+
+  <!-- ═══ HISTORY ═══ -->
+  <div class="section-panel ${activeSection==='history'?'active':''}" id="panel-history">
+    <div class="section-label">INSPECTION HISTORY — ${activeCrane}</div>
+
+    ${(()=>{
+      const records = (historyDB[activeCrane]||[]);
+      if(records.length===0) return `<div class="history-empty">NO INSPECTION HISTORY YET<br><span style="font-size:10px;opacity:.5">History is recorded every time you save an inspection</span></div>`;
+
+      return `
+      <!-- Stats strip -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:20px">
+        <div style="background:var(--surface2);padding:10px;text-align:center">
+          <div style="font-family:var(--head);font-weight:900;font-size:28px;color:var(--accent)">${records.length}</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:1px">TOTAL RECORDS</div>
+        </div>
+        <div style="background:var(--surface2);padding:10px;text-align:center">
+          <div style="font-family:var(--head);font-weight:900;font-size:28px;color:var(--accent2)">${records[0].date||'—'}</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:1px">LAST INSPECTION</div>
+        </div>
+        <div style="background:var(--surface2);padding:10px;text-align:center">
+          <div style="font-family:var(--head);font-weight:900;font-size:16px;color:var(--good);line-height:1.3">${records[0].inspector||'—'}</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:1px;margin-top:4px">LAST INSPECTOR(S)</div>
+        </div>
+        <div style="background:var(--surface2);padding:10px;text-align:center">
+          ${(()=>{const s=records[0].summary;const scored=s.good*100+s.fair*60;const pct=s.total>0?Math.round(scored/s.total):100;const col=pct>=95?'var(--good)':pct>=70?'var(--warn)':'var(--danger)';return `<div style="font-family:var(--head);font-weight:900;font-size:28px;color:${col}">${pct}%</div><div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:1px">LAST HEALTH SCORE</div>`;})()}
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="card">
+        <div class="card-title" style="font-size:16px;margin-bottom:16px">INSPECTION TIMELINE</div>
+        <div class="history-timeline">
+          ${records.map((snap,idx)=>{
+            const s=snap.summary;
+            const scored=s.good*100+s.fair*60;
+            const pct=s.total>0?Math.round(scored/s.total):100;
+            const dotCol=pct>=95?'#1a9a8a':pct>=70?'#c49000':'#c0222e';
+            const savedTime=new Date(snap.savedAt).toLocaleString('en-GB',{hour12:false,day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+            return `<div class="history-entry">
+              <div class="history-date">
+                <div style="font-weight:700;color:var(--text)">${snap.date||'No date'}</div>
+                <div style="font-size:10px">${savedTime}</div>
+                <div style="font-size:10px;color:var(--accent2)">${snap.shift||''}</div>
+              </div>
+              <div class="history-dot" style="background:${dotCol}"></div>
+              <div class="history-body">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                  <span style="font-family:var(--head);font-weight:900;font-size:22px;color:${dotCol}">${pct}%</span>
+                  <span style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">${pct>=95?'HEALTHY':pct>=70?'MONITOR':'CRITICAL'}</span>
+                  ${idx===0?'<span style="font-family:var(--mono);font-size:9px;background:var(--accent);color:#fff;padding:2px 6px;letter-spacing:1px">LATEST</span>':''}
+                </div>
+                <div style="font-family:var(--mono);font-size:11px;color:var(--text);margin-bottom:4px">
+                  <span style="color:var(--text-dim)">Inspectors:</span> <b>${snap.inspector||'—'}</b>
+                </div>
+                <div style="display:flex;gap:14px;font-family:var(--mono);font-size:11px;flex-wrap:wrap">
+                  <span style="color:var(--good)">✔ ${s.good} GOOD</span>
+                  <span style="color:var(--warn)">⚠ ${s.fair} MEDIUM</span>
+                  <span style="color:var(--danger)">✖ ${s.poor} BIG PLAY</span>
+                  <span style="color:var(--text-dim)">${s.total} TOTAL ITEMS</span>
+                </div>
+                ${snap.sectionSummary?`
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:8px">
+                  ${[
+                    ['🔧 SHEAVES',    snap.sectionSummary.sheaves,    'sheaves'],
+                    ['⚙ WHEELS',     snap.sectionSummary.wheels,     'wheels'],
+                    ['💨 INV. FANS',  snap.sectionSummary.fans,       'fans'],
+                    ['🪢 WIRE ROPES', snap.sectionSummary.wireropes,  'wireropes'],
+                  ].map(([lbl,ss,secKey])=>{
+                    const secInsp=(snap.sectionInspectors||{})[secKey]||'';
+                    const secDate=(snap.sectionDates||{})[secKey]||'';
+                    const secShift=(snap.sectionShifts||{})[secKey]||'';
+                    const shortName=secInsp?secInsp.split(' ').slice(-1)[0]:'—';
+                    if(!ss||ss.total===0) return `<div style="background:var(--surface2);border:1px solid var(--border);padding:6px 8px;font-family:var(--mono);font-size:9px;opacity:.4">
+                      <div style="color:var(--text-dim);letter-spacing:1px;margin-bottom:2px">${lbl}</div>
+                      <div style="color:var(--text-dim)">NOT INSPECTED</div>
+                    </div>`;
+                    const secCol=ss.poor>0?'var(--danger)':ss.fair>0?'var(--warn)':'var(--good)';
+                    const secStatus=ss.poor>0?'CRITICAL':ss.fair>0?'MONITOR':'GOOD';
+                    return `<div style="background:var(--surface2);border:1px solid ${secCol};border-top:2px solid ${secCol};padding:6px 8px;font-family:var(--mono);font-size:9px">
+                      <div style="color:var(--text-dim);letter-spacing:1px;margin-bottom:2px">${lbl}</div>
+                      <div style="color:${secCol};font-weight:700;font-size:10px;margin-bottom:3px">${secStatus}</div>
+                      <div style="margin-bottom:4px"><span style="color:var(--good)">✔${ss.good} </span><span style="color:var(--warn)">⚠${ss.fair} </span><span style="color:var(--danger)">✖${ss.poor}</span></div>
+                      <div style="border-top:1px solid var(--border);padding-top:3px;margin-top:2px">
+                        <div style="color:var(--text-dim)">👤 ${shortName}</div>
+                        ${secDate?`<div style="color:var(--text-dim)">${secDate}</div>`:''}
+                        ${secShift?`<div style="color:var(--text-dim)">${secShift}</div>`:''}
+                      </div>
+                    </div>`;
+                  }).join('')}
+                </div>`:''}
+              </div>
+              <div class="history-actions">
+                <button class="btn-history" onclick="exportSnapshot('${activeCrane}',${snap.id})" title="Export this inspection">⬇ EXPORT</button>
+                <button class="btn-history" onclick="restoreSnapshot('${activeCrane}',${snap.id})" title="Restore this inspection" style="color:var(--accent);border-color:var(--accent)">↩ RESTORE</button>
+                <button class="btn-history" onclick="deleteSnapshot('${activeCrane}',${snap.id})" title="Delete this record" style="color:var(--danger);border-color:var(--danger)">✕</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    })()}
+  </div>
+
+  <div style="height:68px"></div>`;
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+let fleetMode=false;
+
+function renderCraneTabs(){
+  const fleetTab=`<div class="crane-tab ${fleetMode?'active':''}" onclick="selectFleet()" style="${fleetMode?'':''}border-right:2px solid var(--accent2);font-weight:900;color:${fleetMode?'var(--accent2)':'var(--text-dim)'}">⊞ FLEET</div>`;
+  const craneTabs=CRANES.map(c=>{
+    const s=calcSummary(db[c]);
+    const dot=s.poor>0?'danger':s.fair>0?'warn':'';
+    return `<div class="crane-tab ${(!fleetMode&&c===activeCrane)?'active':''}" onclick="selectCrane('${c}')"><span class="sdot ${dot}"></span>${c}</div>`;
+  }).join('');
+  document.getElementById('craneTabs').innerHTML=fleetTab+craneTabs;
+}
+
+function selectFleet(){
+  if(editMode){harvestForm();localStorage.setItem('craneDB_v3',JSON.stringify(db));}
+  fleetMode=true;editMode=false;
+  document.body.classList.remove('edit-mode');
+  document.getElementById('editBtn').classList.remove('active');
+  document.getElementById('sectionNav').style.display='none';
+  renderCraneTabs();
+  renderFleetOverview();
+}
+
+function renderFleetOverview(){
+  const pts={'GOOD':100,'MEDIUM PLAY':60,'BIG PLAY':0};
+  document.getElementById('mainContent').innerHTML=`
+  <div class="section-label">FLEET HEALTH OVERVIEW — ALL CRANES</div>
+  <div id="fleet-summary-strip" class="summary-strip" style="margin-bottom:20px">
+    ${(()=>{
+      let totalGood=0,totalFair=0,totalPoor=0,totalItems=0,totalScore=0;
+      CRANES.forEach(c=>{const s=calcSummary(db[c]);totalGood+=s.good;totalFair+=s.fair;totalPoor+=s.poor;totalItems+=s.total;});
+      const scored=totalGood*100+totalFair*60+totalPoor*0;
+      const pct=totalItems>0?Math.round(scored/totalItems):'—';
+      const col=pct>=95?'var(--good)':pct>=70?'var(--warn)':'var(--danger)';
+      return `<div class="summary-cell"><div class="val" style="color:${col}">${pct}%</div><div class="lbl">FLEET HEALTH</div></div>
+      <div class="summary-cell"><div class="val val-good">${totalGood}</div><div class="lbl">GOOD ITEMS</div></div>
+      <div class="summary-cell"><div class="val val-warn">${totalFair}</div><div class="lbl">MEDIUM PLAY</div></div>
+      <div class="summary-cell"><div class="val val-danger">${totalPoor}</div><div class="lbl">BIG PLAY</div></div>`;
+    })()}
+  </div>
+  <div class="fleet-grid">
+    ${CRANES.map(c=>{
+      const s=calcSummary(db[c]);
+      const d=db[c];
+      const scored=s.good*100+s.fair*60;
+      const pct=s.total>0?Math.round(scored/s.total):100;
+      const barColor=pct>=95?'#1a9a8a':pct>=70?'#c49000':'#c0222e';
+      const statusLabel=pct>=95?'HEALTHY':pct>=70?'MONITOR':'CRITICAL';
+      const dot=s.poor>0?'#c0222e':s.fair>0?'#c49000':'#1a9a8a';
+      return `<div class="fleet-card" onclick="selectCrane('${c}')">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="fleet-card-name">${c}</div>
+          <div style="width:10px;height:10px;border-radius:50%;background:${dot}"></div>
+        </div>
+        <div class="fleet-card-meta">${d.meta.inspector?'INSP: '+d.meta.inspector:'NO INSPECTOR'} · ${d.meta.date||'NO DATE'}</div>
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          ${miniSpeedo(c+'_fleet',pct)}
+          <div style="padding-bottom:4px">
+            <div style="font-family:var(--head);font-weight:900;font-size:28px;color:${barColor};line-height:1">${pct}%</div>
+            <div style="font-family:var(--mono);font-size:10px;color:${barColor};letter-spacing:1px">${statusLabel}</div>
+          </div>
+        </div>
+        <div class="fleet-card-bar"><div class="fleet-card-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
+        <div class="fleet-card-counts">
+          <span style="color:var(--good)">✔${s.good}</span>
+          <span style="color:var(--warn)">⚠${s.fair}</span>
+          <span style="color:var(--danger)">✖${s.poor}</span>
+          <span style="color:var(--text-dim);margin-left:auto">${s.total} PCS</span>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function selectCrane(c){
+  if(editMode){harvestForm();localStorage.setItem('craneDB_v3',JSON.stringify(db));}
+  activeCrane=c;editMode=false;fleetMode=false;
+  document.body.classList.remove('edit-mode');
+  document.getElementById('editBtn').classList.remove('active');
+  document.getElementById('sectionNav').style.display='flex';
+  renderCraneTabs();renderPage();
+}
+
+function switchSection(tab){
+  document.querySelectorAll('.snav-tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  activeSection=tab.dataset.sec;
+  document.querySelectorAll('.section-panel').forEach(p=>p.classList.remove('active'));
+  const p=document.getElementById('panel-'+activeSection);
+  if(p)p.classList.add('active');
+}
+
+// Live refresh when a status select changes in edit mode
+document.addEventListener('change', e=>{
+  if(!editMode) return;
+  if(!e.target.classList.contains('status-select')) return;
+  const path = e.target.dataset.path||'';
+  setNested(db[activeCrane], path, e.target.value);
+  if(path.match(/^(hoist|trolley|boom)Sheaves\./)) refreshSpeedometers();
+});
+
+function refreshSpeedometers(){
+  const configs=[
+    {id:'hoist',   groups:HOIST_GROUPS,   section:'hoistSheaves',   title:'HOIST SHEAVES'},
+    {id:'trolley', groups:TROLLEY_GROUPS, section:'trolleySheaves', title:'TROLLEY SHEAVES'},
+    {id:'boom',    groups:BOOM_GROUPS,    section:'boomSheaves',    title:'BOOM SHEAVES'},
+  ];
+  configs.forEach(c=>{
+    const el=document.getElementById('speedo-'+c.id);
+    if(!el) return;
+    const h=calcGroupHealth(c.groups,c.section);
+    el.outerHTML=renderSpeedometer(c.id,h.pct,c.title,h.good,h.fair,h.poor,h.total);
+  });
+}
+
+// ── EDIT ──────────────────────────────────────────────────────────────────────
+function toggleEdit(){
+  editMode=!editMode;
+  document.body.classList.toggle('edit-mode',editMode);
+  document.getElementById('editBtn').classList.toggle('active',editMode);
+  if(editMode){
+    const s=calcSummary(db[activeCrane]);
+    const warn=s.poor>0?` · <span style="color:var(--danger);font-weight:700">⚠ ${s.poor} BIG PLAY ITEM${s.poor>1?'S':''} FLAGGED</span>`:'';
+    document.getElementById('saveBarInfo').innerHTML=`⚡ EDIT MODE ACTIVE — Changes unsaved${warn}`;
+  }
+}
+
+function harvestForm(){
+  document.querySelectorAll('.info-input').forEach(i=>{ db[activeCrane].meta[i.dataset.key]=i.value; });
+  // Per-section inspectors
+  if(!db[activeCrane].meta.inspectors) db[activeCrane].meta.inspectors={};
+  document.querySelectorAll('.section-inspector-select').forEach(s=>{
+    db[activeCrane].meta.inspectors[s.dataset.seckey]=s.value;
+  });
+  document.querySelectorAll('.status-select').forEach(s=>setNested(db[activeCrane],s.dataset.path,s.value));
+  document.querySelectorAll('.num-input').forEach(i=>setNested(db[activeCrane],i.dataset.path,i.value));
+  document.querySelectorAll('textarea[data-path]').forEach(t=>setNested(db[activeCrane],t.dataset.path,t.value));
+}
+
+function saveData(){
+  harvestForm();
+  const snap = saveSnapshot(activeCrane);
+  localStorage.setItem('craneDB_v3',JSON.stringify(db));
+  // Push to Firebase
+  pushToCloud(activeCrane);
+  if(snap) pushHistoryToCloud(activeCrane, snap);
+  editMode=false;
+  document.body.classList.remove('edit-mode');
+  document.getElementById('editBtn').classList.remove('active');
+  renderCraneTabs();renderPage();
+  const s=calcSummary(db[activeCrane]);
+  const msg=s.poor>0?`✔ Saved — ⚠ ${s.poor} BIG PLAY item${s.poor>1?'s':''} require attention!`:`✔ Inspection saved for ${activeCrane}`;
+  alert(msg);
+}
+
+function exportData(){
+  harvestForm();
+  const blob=new Blob([JSON.stringify({crane:activeCrane,exported:new Date().toISOString(),data:db[activeCrane]},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`${activeCrane}_inspection_${new Date().toISOString().slice(0,10)}.json`;a.click();
+}
+
+// ── IMPORT ─────────────────────────────────────────────────────────────────────
+let _importPayload=null;
+
+function openImportModal(){
+  _importPayload=null;
+  document.getElementById('importDrop').className='import-drop';
+  document.getElementById('importDrop').textContent='';
+  document.getElementById('importDrop').innerHTML='DROP JSON FILE HERE<br><span style="font-size:11px;opacity:.6">or click to browse</span>';
+  document.getElementById('importStatus').textContent='';
+  document.getElementById('importConfirmBtn').disabled=true;
+  document.getElementById('importConfirmBtn').style.opacity='.4';
+  document.getElementById('importConfirmBtn').style.cursor='not-allowed';
+  document.getElementById('importFileInput').value='';
+  document.getElementById('importModal').classList.add('open');
+}
+function closeImportModal(){document.getElementById('importModal').classList.remove('open');}
+function handleImportDrop(e){
+  e.preventDefault();
+  document.getElementById('importDrop').classList.remove('drag-over');
+  const file=e.dataTransfer.files[0];
+  if(file)processImportFile(file);
+}
+function handleImportFile(input){
+  const file=input.files[0];
+  if(file)processImportFile(file);
+}
+function processImportFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const parsed=JSON.parse(e.target.result);
+      if(!parsed.crane||!parsed.data){throw new Error('Invalid format');}
+      if(!CRANES.includes(parsed.crane)){throw new Error('Unknown crane: '+parsed.crane);}
+      _importPayload=parsed;
+      document.getElementById('importDrop').className='import-drop file-ready';
+      document.getElementById('importDrop').innerHTML=`✔ <b>${file.name}</b><br><span style="font-size:11px">Crane: ${parsed.crane} · Exported: ${parsed.exported?parsed.exported.slice(0,10):'unknown'}</span>`;
+      document.getElementById('importStatus').textContent='Ready to import. This will overwrite current data for '+parsed.crane+'.';
+      document.getElementById('importStatus').style.color='var(--good)';
+      document.getElementById('importConfirmBtn').disabled=false;
+      document.getElementById('importConfirmBtn').style.opacity='1';
+      document.getElementById('importConfirmBtn').style.cursor='pointer';
+    }catch(err){
+      document.getElementById('importStatus').textContent='⚠ Error: '+err.message;
+      document.getElementById('importStatus').style.color='var(--danger)';
+    }
+  };
+  reader.readAsText(file);
+}
+function confirmImport(){
+  if(!_importPayload)return;
+  const {crane,data}=_importPayload;
+  db[crane]=data;
+  localStorage.setItem('craneDB_v3',JSON.stringify(db));
+  closeImportModal();
+  activeCrane=crane;fleetMode=false;
+  document.getElementById('sectionNav').style.display='flex';
+  renderCraneTabs();renderPage();
+  alert('✔ Imported inspection data for '+crane);
+}
+
+// ── HISTORY STORAGE ───────────────────────────────────────────────────────────
+let historyDB={};
+try{const h=localStorage.getItem('craneHistoryDB_v1');historyDB=h?JSON.parse(h):{};}catch(e){historyDB={};}
+CRANES.forEach(c=>{if(!historyDB[c])historyDB[c]=[];});
+
+function saveSnapshot(crane){
+  if(!historyDB[crane]) historyDB[crane]=[];
+
+  // Per-section partial summaries for history display
+  const d=db[crane];
+  const sectionSummary={};
+  // Sheaves
+  const walkSection=(keys)=>{
+    let g=0,f=0,p=0,t=0;
+    const walk=v=>{
+      if(typeof v==='string'){
+        if(STATUS_OPTS.includes(v)&&v!=='N/A'){t++;if(v==='GOOD')g++;else if(v==='MEDIUM PLAY')f++;else if(v==='BIG PLAY')p++;}
+        else if(v.startsWith('1 —')){t++;g++;}
+        else if(v.startsWith('2 —')){t++;f++;}
+        else if(v.startsWith('3 —')){t++;p++;}
+      }else if(v&&typeof v==='object')Object.values(v).forEach(walk);
+    };
+    keys.forEach(k=>walk(d[k]));
+    return {good:g,fair:f,poor:p,total:t};
+  };
+  sectionSummary.sheaves=walkSection(['hoistSheaves','trolleySheaves','boomSheaves']);
+  sectionSummary.wheels=walkSection(['trolleyWheels']);
+  // Fans
+  let fg=0,ff=0,fp=0,ft=0;
+  if(d.inverterFans) Object.values(d.inverterFans).forEach(fan=>{const s=fan.status||'';if(s==='GOOD'){ft++;fg++;}else if(s==='WARNING'){ft++;ff++;}else if(s==='FAULT'){ft++;fp++;}});
+  sectionSummary.fans={good:fg,fair:ff,poor:fp,total:ft};
+
+  // Wire ropes section summary
+  const ropeTypes=[
+    {key:'hoist',   nomDia:31.5, discDia:29.3, sides:['landSide','seaSide']},
+    {key:'trolley', nomDia:25,   discDia:23,   sides:['leftSide','rightSide']},
+    {key:'boom',    nomDia:35,   discDia:32.5, sides:['main']},
+  ];
+  let rg=0,rf=0,rp=0,rt=0;
+  if(d.wireRopes){
+    ropeTypes.forEach(rope=>{
+      const rData=d.wireRopes[rope.key]||{};
+      rope.sides.forEach(side=>{
+        const sd=rData[side]||{};
+        const rows=Array.isArray(sd.rows)?sd.rows:[];
+        const hasData=rows.some(r=>r.measDia||r.breaks6d||r.breaks30d);
+        if(!hasData) return;
+        let status='GOOD';
+        rows.forEach(r=>{
+          const m=parseFloat(r.measDia);
+          if(!isNaN(m)){if(m<=rope.discDia)status='REPLACE';else if(m<rope.nomDia*0.93&&status!=='REPLACE')status='MONITOR';}
+          const b6=parseInt(r.breaks6d)||0,b30=parseInt(r.breaks30d)||0;
+          if(b6>16||b30>32)status='REPLACE';
+          else if((b6>12||b30>24)&&status!=='REPLACE')status='MONITOR';
+        });
+        rt++;
+        if(status==='GOOD')rg++;else if(status==='MONITOR')rf++;else rp++;
+      });
+    });
+  }
+  sectionSummary.wireropes={good:rg,fair:rf,poor:rp,total:rt};
+
+  // Safe accessor — handles both old flat and new nested structure
+  const secMeta = (key, field) => {
+    const insp = d.meta?.inspectors?.[key];
+    if(!insp || typeof insp !== 'object') return '';
+    return insp[field]||'';
+  };
+
+  // Derive overall inspector label from section inspectors (list all unique names)
+  const allInspectors = ['sheaves','wheels','fans','wireropes']
+    .map(k=>secMeta(k,'inspector'))
+    .filter(Boolean);
+  const uniqueInspectors = [...new Set(allInspectors)];
+  const globalInspector = uniqueInspectors.length>0 ? uniqueInspectors.join(', ') : (d.meta.inspector||'—');
+
+  const snap={
+    id: Date.now(),
+    savedAt: new Date().toISOString(),
+    inspector: globalInspector,
+    sectionInspectors:{
+      sheaves:  secMeta('sheaves','inspector'),
+      wheels:   secMeta('wheels','inspector'),
+      fans:     secMeta('fans','inspector'),
+      wireropes:secMeta('wireropes','inspector'),
+    },
+    sectionDates:{
+      sheaves:  secMeta('sheaves','date'),
+      wheels:   secMeta('wheels','date'),
+      fans:     secMeta('fans','date'),
+      wireropes:secMeta('wireropes','date'),
+    },
+    sectionShifts:{
+      sheaves:  secMeta('sheaves','shift'),
+      wheels:   secMeta('wheels','shift'),
+      fans:     secMeta('fans','shift'),
+      wireropes:secMeta('wireropes','shift'),
+    },
+    date: d.meta.date||'',
+    shift: d.meta.shift||'',
+    summary: calcSummary(d),
+    sectionSummary,
+    data: JSON.parse(JSON.stringify(d))
+  };
+  historyDB[crane].unshift(snap);
+  if(historyDB[crane].length>100) historyDB[crane]=historyDB[crane].slice(0,100);
+  localStorage.setItem('craneHistoryDB_v1',JSON.stringify(historyDB));
+  return snap;
+}
+
+function exportSnapshot(crane, id){
+  const snap = historyDB[crane]?.find(s=>s.id===id);
+  if(!snap) return;
+  const blob=new Blob([JSON.stringify({crane,exported:new Date().toISOString(),data:snap.data},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`${crane}_inspection_${snap.date||snap.savedAt.slice(0,10)}.json`;a.click();
+}
+
+function deleteSnapshot(crane, id){
+  if(!confirm('Delete this inspection record? This cannot be undone.')) return;
+  historyDB[crane]=historyDB[crane].filter(s=>s.id!==id);
+  localStorage.setItem('craneHistoryDB_v1',JSON.stringify(historyDB));
+  renderPage();
+}
+
+function restoreSnapshot(crane, id){
+  if(!confirm('Restore this inspection? Current data will be overwritten.')) return;
+  const snap = historyDB[crane]?.find(s=>s.id===id);
+  if(!snap) return;
+  db[crane]=JSON.parse(JSON.stringify(snap.data));
+  localStorage.setItem('craneDB_v3',JSON.stringify(db));
+  editMode=false;
+  document.body.classList.remove('edit-mode');
+  renderCraneTabs();renderPage();
+  alert(`✔ Restored inspection from ${snap.date||snap.savedAt.slice(0,10)}`);
+}
+function updateTS(){document.getElementById('ts').textContent=new Date().toLocaleString('en-GB',{hour12:false}).replace(',','');}
+updateTS();setInterval(updateTS,1000);
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.getElementById('sectionNav').style.display='flex';
+renderCraneTabs();
+renderPage();
+
+// Initial Firebase sync
+if(fbOnline){
+  pullFromCloud();
+} else {
+  setSyncStatus('offline','Offline — local data');
+}
+</script>
+</body>
+</html>
